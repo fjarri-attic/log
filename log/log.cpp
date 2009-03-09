@@ -11,8 +11,9 @@ struct MessageParameters
 	MessageParameters *NextMessage;
 	size_t BufferSize;
 	bool Unicode;
+	bool BufferSwap;
 
-	MessageParameters() { NextMessage = NULL; }
+	MessageParameters() { NextMessage = NULL; BufferSwap = false; }
 };
 
 struct LogFile
@@ -25,7 +26,9 @@ struct LogFile
 
 	CRITICAL_SECTION cs;
 
-	Buffer Buf;
+	Buffer Bufs[2];
+	int CurrentBuf;
+
 	char *PushCursor;
 	char *PopCursor;
 
@@ -56,9 +59,13 @@ struct LogFile
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
 
-		Buf.Resize(100 * 1024 * 1024);
-		PushCursor = (char *)Buf.GetPtr();
-		PopCursor = (char *)Buf.GetPtr();
+		CurrentBuf = 0;
+
+		Bufs[0].Resize(1024 * 1024);
+		Bufs[1].Resize(1024 * 1024);
+
+		PushCursor = (char *)Bufs[CurrentBuf].GetPtr();
+		PopCursor = (char *)Bufs[CurrentBuf].GetPtr();
 		((MessageParameters *)PushCursor)->NextMessage = NULL;
 	}
 
@@ -73,16 +80,27 @@ struct LogFile
 	{
 		char *cur;
 
+		size_t message_size = sizeof(*params) + params->BufferSize;
+
 		EnterCriticalSection(&cs);
+		if(Bufs[CurrentBuf].GetDataSize() - (PushCursor - (char *)Bufs[CurrentBuf].GetPtr()) < 
+			message_size + sizeof(*params))
+		{
+			((MessageParameters *)PushCursor)->NextMessage = (MessageParameters *)Bufs[1 - CurrentBuf].GetPtr();
+			((MessageParameters *)PushCursor)->BufferSwap = true;
+
+			CurrentBuf = 1 - CurrentBuf;
+			PushCursor = (char *)Bufs[CurrentBuf].GetPtr();
+		}
 		cur = PushCursor;
-		PushCursor += sizeof(*params) + params->BufferSize;
+		PushCursor += message_size;
 		LeaveCriticalSection(&cs);
 
 		memcpy(cur, params, sizeof(*params));
 		memcpy(cur + sizeof(*params), message, params->BufferSize);
 		
 		EnterCriticalSection(&cs);
-		((MessageParameters *)cur)->NextMessage = (MessageParameters *)PushCursor;
+		((MessageParameters *)cur)->NextMessage = (MessageParameters *)(cur + message_size);
 		LeaveCriticalSection(&cs);
 	}
 
@@ -98,7 +116,16 @@ struct LogFile
 			if(((MessageParameters *)PopCursor)->NextMessage)
 				cur = PopCursor;
 			LeaveCriticalSection(&cs);
-			Sleep(0);
+
+			if(cur)
+			{
+				if(((MessageParameters *)cur)->BufferSwap)
+					cur = NULL;
+			}
+			else 
+			{
+				Sleep(0);
+			}
 		}
 
 		memcpy(&params, cur, sizeof(params));
