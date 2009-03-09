@@ -8,14 +8,15 @@
 
 struct MessageParameters
 {
+	MessageParameters *NextMessage;
 	size_t BufferSize;
 	bool Unicode;
+
+	MessageParameters() { NextMessage = NULL; }
 };
 
 struct LogFile
 {
-	HANDLE WriteEnd;
-	HANDLE ReadEnd;
 	TCHAR FileName[MAX_PATH];
 	HANDLE File;
 
@@ -23,6 +24,10 @@ struct LogFile
 	BOOLEAN ReplaceLF;
 
 	CRITICAL_SECTION cs;
+
+	Buffer Buf;
+	char *PushCursor;
+	char *PopCursor;
 
 	DWORD Open()
 	{
@@ -50,39 +55,57 @@ struct LogFile
 		KeepClosed = TRUE;
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
+
+		Buf.Resize(100 * 1024 * 1024);
+		PushCursor = (char *)Buf.GetPtr();
+		PopCursor = (char *)Buf.GetPtr();
+		((MessageParameters *)PushCursor)->NextMessage = NULL;
 	}
 
 	~LogFile() 
 	{ 
 		DeleteCriticalSection(&cs); 
-		CloseHandle(ReadEnd);
-		CloseHandle(WriteEnd);
-		CloseHandle(File);
+		if(File != INVALID_HANDLE_VALUE)
+			CloseHandle(File);
 	}
 
 	VOID Push(const MessageParameters *params, const void *message)
 	{
-		DWORD dw;
+		char *cur;
+
 		EnterCriticalSection(&cs);
-		WriteFile(WriteEnd, (PVOID)params, sizeof(*params), &dw, NULL);
-		WriteFile(WriteEnd, message, (DWORD)params->BufferSize, &dw, NULL);
+		cur = PushCursor;
+		PushCursor += sizeof(*params) + params->BufferSize;
+		LeaveCriticalSection(&cs);
+
+		memcpy(cur, params, sizeof(*params));
+		memcpy(cur + sizeof(*params), message, params->BufferSize);
+		
+		EnterCriticalSection(&cs);
+		((MessageParameters *)cur)->NextMessage = (MessageParameters *)PushCursor;
 		LeaveCriticalSection(&cs);
 	}
 
-	DWORD Pop(Buffer &dst)
+	VOID Pop(Buffer &dst)
 	{
 		MessageParameters params;
-		DWORD size_read;
 
-		if(!ReadFile(ReadEnd, &params, sizeof(params), &size_read, NULL) || size_read != sizeof(params))
-			return GetLastError();
+		char *cur = NULL;
 
+		while(!cur)
+		{
+			EnterCriticalSection(&cs);
+			if(((MessageParameters *)PopCursor)->NextMessage)
+				cur = PopCursor;
+			LeaveCriticalSection(&cs);
+			Sleep(0);
+		}
+
+		memcpy(&params, cur, sizeof(params));
 		dst.Resize(params.BufferSize);
+		memcpy(dst.GetPtr(), cur + sizeof(params), dst.GetDataSize());
 
-		if(!ReadFile(ReadEnd, dst.GetPtr(), (DWORD)dst.GetDataSize(), &size_read, NULL) || size_read != dst.GetDataSize())
-			return GetLastError();
-
-		return 0;
+		PopCursor = (char *)params.NextMessage;
 	}
 
 	DWORD Write(LPCVOID buf, size_t size)
@@ -135,9 +158,7 @@ DWORD WINAPI LogThreadProc(PVOID context)
 
 	while(1)
 	{
-		res = log_file->Pop(raw_buf);
-		if(res)
-			return res;
+		log_file->Pop(raw_buf);
 
 		// Replace LF -> CRLF
 		if(log_file->ReplaceLF)
@@ -158,7 +179,6 @@ DWORD WINAPI LogThreadProc(PVOID context)
 LOG_API DWORD LogInit(const TCHAR *file_name)
 {
 	DWORD dw;
-	HANDLE hRead, hWrite;
 
 	// Create logfile
 	_tcscpy_s(log_file.FileName, MAX_PATH, file_name);
@@ -168,13 +188,6 @@ LOG_API DWORD LogInit(const TCHAR *file_name)
 		log_file.Close();
 		return dw;
 	}
-
-	// Create pipe
-	if(!CreatePipe(&hRead, &hWrite, NULL, 10000000))
-		return GetLastError();
-
-	log_file.WriteEnd = hWrite;
-	log_file.ReadEnd = hRead;
 
 	// Create logging thread
 	HANDLE logger_thread = CreateThread(NULL, 0, LogThreadProc, (PVOID)&log_file, 0, &dw);
