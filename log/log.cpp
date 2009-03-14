@@ -11,9 +11,9 @@ struct MessageParameters
 	MessageParameters *NextMessage;
 	size_t BufferSize;
 	bool Unicode;
-	bool BufferSwap;
+	bool Redirector;
 
-	MessageParameters() { NextMessage = NULL; BufferSwap = false; }
+	MessageParameters() { NextMessage = NULL; Redirector = false; }
 };
 
 struct LogFile
@@ -26,8 +26,8 @@ struct LogFile
 
 	CRITICAL_SECTION cs;
 
-	Buffer Bufs[2];
-	int CurrentBuf;
+	char *Buf;
+	size_t BufSize;
 
 	char *PushCursor;
 	char *PopCursor;
@@ -59,13 +59,12 @@ struct LogFile
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
 
-		CurrentBuf = 0;
+		BufSize = 1024 * 1024;
+		Buf = new char[BufSize];
+		ZeroMemory(Buf, BufSize);
 
-		Bufs[0].Resize(1024 * 1024);
-		Bufs[1].Resize(1024 * 1024);
-
-		PushCursor = (char *)Bufs[CurrentBuf].GetPtr();
-		PopCursor = (char *)Bufs[CurrentBuf].GetPtr();
+		PushCursor = Buf;
+		PopCursor = Buf;
 		((MessageParameters *)PushCursor)->NextMessage = NULL;
 	}
 
@@ -83,15 +82,13 @@ struct LogFile
 		size_t message_size = sizeof(*params) + params->BufferSize;
 
 		EnterCriticalSection(&cs);
-		if(Bufs[CurrentBuf].GetDataSize() - (PushCursor - (char *)Bufs[CurrentBuf].GetPtr()) < 
-			message_size + sizeof(*params))
+		if(BufSize - (PushCursor - Buf) < message_size + sizeof(*params))
 		{
-			((MessageParameters *)PushCursor)->NextMessage = (MessageParameters *)Bufs[1 - CurrentBuf].GetPtr();
-			((MessageParameters *)PushCursor)->BufferSwap = true;
-
-			CurrentBuf = 1 - CurrentBuf;
-			PushCursor = (char *)Bufs[CurrentBuf].GetPtr();
+			((MessageParameters *)PushCursor)->NextMessage = (MessageParameters *)Buf;
+			((MessageParameters *)PushCursor)->Redirector = true;
+			PushCursor = (char *)Buf;
 		}
+
 		cur = PushCursor;
 		PushCursor += message_size;
 		LeaveCriticalSection(&cs);
@@ -119,7 +116,7 @@ struct LogFile
 
 			if(cur)
 			{
-				if(((MessageParameters *)cur)->BufferSwap)
+				if(((MessageParameters *)cur)->Redirector)
 					cur = NULL;
 			}
 			else 
