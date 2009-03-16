@@ -5,6 +5,9 @@
 #include <tchar.h>
 #include "log.h"
 #include "misc.h"
+#include <stdio.h>
+
+#include <crtdbg.h>
 
 struct MessageParameters
 {
@@ -59,7 +62,7 @@ struct LogFile
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
 
-		BufSize = 1024 * 1024;
+		BufSize = 1024;
 		Buf = new char[BufSize];
 		ZeroMemory(Buf, BufSize);
 
@@ -70,6 +73,8 @@ struct LogFile
 
 	~LogFile() 
 	{ 
+		if(Buf)
+			delete[] Buf;
 		DeleteCriticalSection(&cs); 
 		if(File != INVALID_HANDLE_VALUE)
 			CloseHandle(File);
@@ -82,6 +87,53 @@ struct LogFile
 		size_t message_size = sizeof(*params) + params->BufferSize;
 
 		EnterCriticalSection(&cs);
+		if(((PushCursor < PopCursor) && (PopCursor - PushCursor < message_size)) ||
+			((PushCursor > PopCursor) && (BufSize - (PushCursor - Buf) < message_size + sizeof(*params)) && (PopCursor - Buf < message_size)) ||
+			((PushCursor == PopCursor) && (((MessageParameters *)PopCursor)->NextMessage != NULL)))
+		{
+			char *new_buf = new char[BufSize * 2];
+			ZeroMemory(new_buf, BufSize * 2);
+
+			if(PushCursor > PopCursor)
+			{
+				memcpy(new_buf, Buf, BufSize);		
+
+				PopCursor = new_buf + (PopCursor - Buf);
+				PushCursor = new_buf + (PushCursor - Buf);
+
+				MessageParameters *temp = (MessageParameters *)PopCursor;
+				while(temp->NextMessage)
+				{
+					temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf));
+					temp = temp->NextMessage;
+				}
+			}
+			else
+			{
+				memcpy(new_buf, Buf, PushCursor - Buf);
+				memcpy(new_buf + BufSize + (PopCursor - Buf), PopCursor, BufSize - (PopCursor - Buf));
+
+				MessageParameters *OldPushCursor = (MessageParameters *)PushCursor;
+				size_t offset = BufSize + (PopCursor - Buf);
+				PopCursor = new_buf + (PopCursor - Buf) + BufSize;
+				PushCursor = new_buf + (PushCursor - Buf);
+
+				MessageParameters *temp = (MessageParameters *)PopCursor;
+				while(temp->NextMessage)
+				{
+					if(temp->NextMessage <= OldPushCursor)
+						temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf));
+					else
+						temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf) + BufSize);
+					temp = temp->NextMessage;
+				}
+			}
+
+			delete[] Buf;
+			Buf = new_buf;
+			BufSize *= 2;
+		}
+
 		if(BufSize - (PushCursor - Buf) < message_size + sizeof(*params))
 		{
 			((MessageParameters *)PushCursor)->NextMessage = (MessageParameters *)Buf;
@@ -91,6 +143,7 @@ struct LogFile
 
 		cur = PushCursor;
 		PushCursor += message_size;
+
 		LeaveCriticalSection(&cs);
 
 		memcpy(cur, params, sizeof(*params));
@@ -111,25 +164,27 @@ struct LogFile
 		{
 			EnterCriticalSection(&cs);
 			if(((MessageParameters *)PopCursor)->NextMessage)
+			{
 				cur = PopCursor;
+				if(((MessageParameters *)cur)->Redirector)
+				{
+					PopCursor = (char*)((MessageParameters *)PopCursor)->NextMessage;
+					cur = NULL;
+				}
+			}
 			LeaveCriticalSection(&cs);
 
-			if(cur)
-			{
-				if(((MessageParameters *)cur)->Redirector)
-					cur = NULL;
-			}
-			else 
-			{
+			if(!cur)
 				Sleep(0);
-			}
 		}
 
 		memcpy(&params, cur, sizeof(params));
 		dst.Resize(params.BufferSize);
 		memcpy(dst.GetPtr(), cur + sizeof(params), dst.GetDataSize());
 
+		EnterCriticalSection(&cs);
 		PopCursor = (char *)params.NextMessage;
+		LeaveCriticalSection(&cs);
 	}
 
 	DWORD Write(LPCVOID buf, size_t size)
