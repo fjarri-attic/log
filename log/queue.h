@@ -1,14 +1,18 @@
-#include <misc.h>
+#include <Windows.h>
+#include "misc.h"
 
 class Queue
 {
 public:
-	void Push(void *buffer, size_t size) = 0;
-	void Pop(Buffer &buffer) = 0;
+	virtual void Push(void *buffer, size_t size) = 0;
+	virtual void Pop(Buffer &buffer) = 0;
 };
 
 class WinApiPipe: public Queue
 {
+	HANDLE WriteEnd;
+	HANDLE ReadEnd;
+	CRITICAL_SECTION CS;
 public:
 	WinApiPipe(size_t buffer_size);
 	~WinApiPipe();
