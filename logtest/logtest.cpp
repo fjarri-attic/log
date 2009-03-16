@@ -68,6 +68,7 @@ int main(int argc, TCHAR *argv[])
 
 	Sleep(10000);
 	SetEvent(stop_event);
+	LogStop();
 	WaitForMultipleObjects(10, threads, TRUE, INFINITE);
 
 	return 0;

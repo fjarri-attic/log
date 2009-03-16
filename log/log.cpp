@@ -35,6 +35,8 @@ struct LogFile
 	char *PushCursor;
 	char *PopCursor;
 
+	HANDLE StopEvent;
+
 	DWORD Open()
 	{
 		if(File == INVALID_HANDLE_VALUE)
@@ -62,13 +64,15 @@ struct LogFile
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
 
-		BufSize = 1024;
+		BufSize = 1024 * 1024;
 		Buf = new char[BufSize];
 		ZeroMemory(Buf, BufSize);
 
 		PushCursor = Buf;
 		PopCursor = Buf;
 		((MessageParameters *)PushCursor)->NextMessage = NULL;
+
+		StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	}
 
 	~LogFile() 
@@ -78,6 +82,8 @@ struct LogFile
 		DeleteCriticalSection(&cs); 
 		if(File != INVALID_HANDLE_VALUE)
 			CloseHandle(File);
+		if(StopEvent)
+			CloseHandle(StopEvent);
 	}
 
 	VOID Push(const MessageParameters *params, const void *message)
@@ -114,7 +120,6 @@ struct LogFile
 				memcpy(new_buf + BufSize + (PopCursor - Buf), PopCursor, BufSize - (PopCursor - Buf));
 
 				MessageParameters *OldPushCursor = (MessageParameters *)PushCursor;
-				size_t offset = BufSize + (PopCursor - Buf);
 				PopCursor = new_buf + (PopCursor - Buf) + BufSize;
 				PushCursor = new_buf + (PushCursor - Buf);
 
@@ -235,7 +240,9 @@ DWORD WINAPI LogThreadProc(PVOID context)
 	Buffer raw_buf, expanded_buf;
 	Buffer &buf = (log_file->ReplaceLF ? expanded_buf : raw_buf);
 
-	while(1)
+	DWORD counter = 0;
+
+	while(WaitForSingleObject(log_file->StopEvent, 0) != WAIT_OBJECT_0)
 	{
 		log_file->Pop(raw_buf);
 
@@ -247,8 +254,12 @@ DWORD WINAPI LogThreadProc(PVOID context)
 		if(res)
 			return res;
 
+		counter++;
+
 		Sleep(0);
 	}
+
+	_tprintf(_T("Logged: %d\n"), counter);
 
 	return 0;
 }
@@ -276,6 +287,11 @@ LOG_API DWORD LogInit(const TCHAR *file_name)
 	return 0;
 }
 
+
+LOG_API VOID LogStop()
+{
+	SetEvent(log_file.StopEvent);
+}
 
 //
 LOG_API VOID LogWrite(const char *message)

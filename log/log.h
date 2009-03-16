@@ -8,4 +8,4 @@
 LOG_API DWORD LogInit(const TCHAR *file_name);
 LOG_API VOID LogWrite(const char *message);
 LOG_API VOID LogWrite(const wchar_t *message);
-
+LOG_API VOID LogStop();
