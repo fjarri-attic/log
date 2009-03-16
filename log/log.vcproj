@@ -183,6 +183,10 @@
 				RelativePath=".\misc.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\queue.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -195,6 +199,10 @@
 			</File>
 			<File
 				RelativePath=".\misc.h"
+				>
+			</File>
+			<File
+				RelativePath=".\queue.h"
 				>
 			</File>
 		</Filter>
