@@ -5,8 +5,6 @@
 
 HANDLE stop_event;
 
-
-
 DWORD WINAPI TesterThread(PVOID context)
 {
 	DWORD num = (DWORD)(ULONG_PTR)context;

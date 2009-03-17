@@ -1,47 +1,6 @@
 #include <Windows.h>
 #include "queue.h"
 
-WinApiPipe::WinApiPipe(size_t buffer_size)
-{
-	ReadEnd = NULL;
-	WriteEnd = NULL;
-
-	InitializeCriticalSection(&CS);
-	CreatePipe(&ReadEnd, &WriteEnd, NULL, (DWORD)buffer_size);
-}
-
-WinApiPipe::~WinApiPipe()
-{
-	CloseHandle(ReadEnd);
-	CloseHandle(WriteEnd);
-	DeleteCriticalSection(&CS);
-}
-
-void WinApiPipe::Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2)
-{
-	DWORD dw;
-	size_t size = size1 + size2;
-	EnterCriticalSection(&CS);
-	WriteFile(WriteEnd, &size, sizeof(size_t), &dw, NULL);
-	WriteFile(WriteEnd, buffer1, (DWORD)size1, &dw, NULL);
-	if(size2)
-		WriteFile(WriteEnd, buffer2, (DWORD)size2, &dw, NULL);
-	LeaveCriticalSection(&CS);
-}
-
-void WinApiPipe::Pop(void *header, size_t header_size, Buffer &buffer)
-{
-	DWORD dw;
-	size_t size;
-	ReadFile(ReadEnd, &size, sizeof(size_t), &dw, NULL);
-	if(header_size)
-		ReadFile(ReadEnd, header, (DWORD)header_size, &dw, NULL);
-	buffer.Resize(size - header_size);
-	ReadFile(ReadEnd, buffer.GetPtr(), (DWORD)size, &dw, NULL);
-}
-
-//
-
 struct QueueElement
 {
 	QueueElement *Next;

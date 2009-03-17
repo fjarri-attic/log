@@ -9,18 +9,7 @@ class Queue
 public:
 	virtual void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2) = 0;
 	virtual void Pop(void *header, size_t header_size, Buffer &buffer) = 0;
-};
-
-class WinApiPipe: public Queue
-{
-	HANDLE WriteEnd;
-	HANDLE ReadEnd;
-	CRITICAL_SECTION CS;
-public:
-	WinApiPipe(size_t buffer_size);
-	~WinApiPipe();
-	void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2);
-	void Pop(void *header, size_t header_size, Buffer &buffer);
+	virtual ~Queue() {}
 };
 
 class RingBuffer: public Queue
