@@ -8,7 +8,7 @@ struct QueueElement
 	QueueElement() { Next = NULL; BufferSize = 0; }
 };
 
-RingBuffer::RingBuffer(size_t buffer_size)
+Queue::Queue(size_t buffer_size)
 {
 	InitializeCriticalSection(&CS);
 
@@ -21,14 +21,14 @@ RingBuffer::RingBuffer(size_t buffer_size)
 	((QueueElement *)PushCursor)->Next = NULL;
 }
 
-RingBuffer::~RingBuffer()
+Queue::~Queue()
 {
 	DeleteCriticalSection(&CS);
 	if(Buf)
 		delete[] Buf;
 }
 
-void RingBuffer::Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2)
+void Queue::Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2)
 {
 	char *cur;
 
@@ -103,7 +103,7 @@ void RingBuffer::Push(const void *buffer1, size_t size1, const void *buffer2, si
 	LeaveCriticalSection(&CS);
 }
 
-void RingBuffer::Pop(void *header, size_t header_size, Buffer &buffer)
+void Queue::Pop(void *header, size_t header_size, Buffer &buffer)
 {
 	QueueElement *params;
 

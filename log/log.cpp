@@ -14,67 +14,73 @@ struct MessageHeader
 	bool Unicode;
 };
 
-struct LogFile
+class File
 {
-	TCHAR FileName[MAX_PATH];
-	HANDLE File;
+	HANDLE FileHandle;
+	void *FileName;
+	bool FileNameIsUnicode;
+	bool KeepClosed;
+public:
+	File(const void *file_name, bool name_is_unicode, bool keep_closed)
+	{
+		size_t buffer_size;
 
-	BOOLEAN KeepClosed;
-	BOOLEAN ReplaceLF;
+		FileHandle = INVALID_HANDLE_VALUE;
+		FileName = NULL;
+		FileNameIsUnicode = name_is_unicode;
+		KeepClosed = keep_closed;
 
-	HANDLE StopEvent;
+		if(name_is_unicode)
+			buffer_size = (wcsnlen((const wchar_t *)file_name, MAX_PATH) + 1) * sizeof(wchar_t);
+		else
+			buffer_size = (strnlen((const char *)file_name, MAX_PATH) + 1) * sizeof(char);
 
-	Queue *MessageQueue;
+		FileName = new char[buffer_size];
+		memcpy(FileName, file_name, buffer_size);
+	}
+
+	~File()
+	{
+		if(FileHandle != INVALID_HANDLE_VALUE)
+			CloseHandle(FileHandle);
+
+		if(FileName)
+			delete[] FileName;
+	}
 
 	DWORD Open()
 	{
-		if(File == INVALID_HANDLE_VALUE)
+		if(FileHandle == INVALID_HANDLE_VALUE)
 		{
-			File = CreateFile(FileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-			if(File == INVALID_HANDLE_VALUE) 
+			if(FileNameIsUnicode)
+				FileHandle = CreateFileW((wchar_t *)FileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			else
+				FileHandle = CreateFileA((char *)FileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+			if(FileHandle == INVALID_HANDLE_VALUE) 
 				return GetLastError();
 		}
 
 		return 0;
 	}
 
-	VOID Close()
+	void Close()
 	{
-		if(KeepClosed && (File != INVALID_HANDLE_VALUE))
+		if(KeepClosed && (FileHandle != INVALID_HANDLE_VALUE))
 		{
-			CloseHandle(File);
-			File = INVALID_HANDLE_VALUE;
+			CloseHandle(FileHandle);
+			FileHandle = INVALID_HANDLE_VALUE;
 		}
 	}
 
-	LogFile() { 
-		KeepClosed = TRUE;
-		ReplaceLF = TRUE;
-		File = INVALID_HANDLE_VALUE;
-
-		StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
-		MessageQueue = new RingBuffer(1024);
-	}
-
-	~LogFile() 
-	{ 
-		if(File != INVALID_HANDLE_VALUE)
-			CloseHandle(File);
-		if(StopEvent)
-			CloseHandle(StopEvent);
-		if(MessageQueue)
-			delete MessageQueue;
-	}
-
-	DWORD Write(LPCVOID buf, size_t size)
+	DWORD Write(const void *buffer, size_t buffer_size)
 	{
 		DWORD res = Open();
 		if(res)
 			return res;
 
 		DWORD size_written;
-		if(!WriteFile(File, buf, (DWORD)size, &size_written, NULL) || size_written != size)
+		if(!WriteFile(FileHandle, buffer, (DWORD)buffer_size, &size_written, NULL) || size_written != (DWORD)buffer_size)
 		{
 			Close();
 			return GetLastError();
@@ -83,21 +89,48 @@ struct LogFile
 		Close();
 		return 0;
 	}
+};
+
+struct LogFile
+{
+	BOOLEAN KeepClosed;
+	BOOLEAN ReplaceLF;
+
+	HANDLE StopEvent;
+
+	Queue MessageQueue;
+	File TargetFile;
+
+	LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed) : 
+		MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
+	{ 
+		ReplaceLF = TRUE;
+		StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	}
+
+	~LogFile() 
+	{ 
+		if(StopEvent)
+			CloseHandle(StopEvent);
+	}
+
+	DWORD Write(LPCVOID buf, size_t size)
+	{
+		return TargetFile.Write(buf, size);
+	}
 
 	void Push(const MessageHeader *header, const void *message, size_t message_size)
 	{
-		MessageQueue->Push(header, sizeof(*header), message, message_size);
+		MessageQueue.Push(header, sizeof(*header), message, message_size);
 	}
 
 	void Pop(MessageHeader *header, Buffer &buffer)
 	{
-		MessageQueue->Pop(header, sizeof(*header), buffer);
+		MessageQueue.Pop(header, sizeof(*header), buffer);
 	}
 };
 
-
-
-LogFile log_file;
+LogFile *log_file;
 
 //
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
@@ -119,7 +152,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 //
 DWORD WINAPI LogThreadProc(PVOID context)
 {
-	LogFile *log_file = (LogFile *)context;
+	LogFile *lf = (LogFile *)context;
 	DWORD res;
 
 	Buffer raw_buf, expanded_buf;
@@ -130,13 +163,13 @@ DWORD WINAPI LogThreadProc(PVOID context)
 
 	while(WaitForSingleObject(log_file->StopEvent, 0) != WAIT_OBJECT_0)
 	{
-		log_file->Pop(&header, raw_buf);
+		lf->Pop(&header, raw_buf);
 
 		// Replace LF -> CRLF
 		if(log_file->ReplaceLF)
 			ExpandLF(raw_buf, expanded_buf);
 
-		res = log_file->Write(buf.GetPtr(), buf.GetDataSize());
+		res = lf->Write(buf.GetPtr(), buf.GetDataSize());
 		if(res)
 			return res;
 
@@ -152,47 +185,50 @@ DWORD WINAPI LogThreadProc(PVOID context)
 
 
 //
-LOG_API DWORD LogInit(const TCHAR *file_name)
+DWORD LogInitInternal(const void *file_name, bool unicode)
 {
 	DWORD dw;
 
 	// Create logfile
-	_tcscpy_s(log_file.FileName, MAX_PATH, file_name);
-	dw = log_file.Open();
-	if(dw)
-	{
-		log_file.Close();
-		return dw;
-	}
+	log_file = new LogFile(file_name, unicode, 1024 * 1024, true);
 
 	// Create logging thread
-	HANDLE logger_thread = CreateThread(NULL, 0, LogThreadProc, (PVOID)&log_file, 0, &dw);
+	HANDLE logger_thread = CreateThread(NULL, 0, LogThreadProc, (PVOID)log_file, 0, &dw);
 	if(logger_thread == INVALID_HANDLE_VALUE)
 		return GetLastError();
 
 	return 0;
 }
 
+LOG_API DWORD LogInitA(const char *file_name)
+{
+	return LogInitInternal(file_name, false);
+}
+
+LOG_API DWORD LogInitW(const wchar_t *file_name)
+{
+	return LogInitInternal(file_name, true);
+}
 
 LOG_API VOID LogStop()
 {
-	SetEvent(log_file.StopEvent);
+	SetEvent(log_file->StopEvent);
 }
 
 //
-LOG_API VOID LogWrite(const char *message)
+LOG_API VOID LogWriteA(const char *message)
 {
 	MessageHeader header;
 	header.Unicode = false;
-	log_file.Push(&header, (const void *)message, strlen(message) * sizeof(char));
+	log_file->Push(&header, (const void *)message, strlen(message) * sizeof(char));
 }
 
 
 //
-LOG_API VOID LogWrite(const wchar_t *message)
+LOG_API VOID LogWriteW(const wchar_t *message)
 {
 	MessageHeader header;
 	header.Unicode = true;
-	log_file.Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
+	log_file->Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
 }
 

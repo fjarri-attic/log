@@ -47,7 +47,7 @@ DWORD WINAPI TesterThread(PVOID context)
 	return 0;
 }
 
-int main(int argc, TCHAR *argv[])
+int _tmain(int argc, TCHAR *argv[])
 {
 	LoadLibrary(_T("log.dll"));
 
