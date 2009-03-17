@@ -5,18 +5,13 @@
 #include <tchar.h>
 #include "log.h"
 #include "misc.h"
+#include "queue.h"
+
 #include <stdio.h>
 
-#include <crtdbg.h>
-
-struct MessageParameters
+struct MessageHeader
 {
-	MessageParameters *NextMessage;
-	size_t BufferSize;
 	bool Unicode;
-	bool Redirector;
-
-	MessageParameters() { NextMessage = NULL; Redirector = false; }
 };
 
 struct LogFile
@@ -27,15 +22,9 @@ struct LogFile
 	BOOLEAN KeepClosed;
 	BOOLEAN ReplaceLF;
 
-	CRITICAL_SECTION cs;
-
-	char *Buf;
-	size_t BufSize;
-
-	char *PushCursor;
-	char *PopCursor;
-
 	HANDLE StopEvent;
+
+	Queue *MessageQueue;
 
 	DWORD Open()
 	{
@@ -59,137 +48,23 @@ struct LogFile
 	}
 
 	LogFile() { 
-		InitializeCriticalSection(&cs); 
 		KeepClosed = TRUE;
 		ReplaceLF = TRUE;
 		File = INVALID_HANDLE_VALUE;
 
-		BufSize = 1024 * 1024;
-		Buf = new char[BufSize];
-		ZeroMemory(Buf, BufSize);
-
-		PushCursor = Buf;
-		PopCursor = Buf;
-		((MessageParameters *)PushCursor)->NextMessage = NULL;
-
 		StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+		MessageQueue = new RingBuffer(1024);
 	}
 
 	~LogFile() 
 	{ 
-		if(Buf)
-			delete[] Buf;
-		DeleteCriticalSection(&cs); 
 		if(File != INVALID_HANDLE_VALUE)
 			CloseHandle(File);
 		if(StopEvent)
 			CloseHandle(StopEvent);
-	}
-
-	VOID Push(const MessageParameters *params, const void *message)
-	{
-		char *cur;
-
-		size_t message_size = sizeof(*params) + params->BufferSize;
-
-		EnterCriticalSection(&cs);
-		if(((PushCursor < PopCursor) && (PopCursor - PushCursor < message_size)) ||
-			((PushCursor > PopCursor) && (BufSize - (PushCursor - Buf) < message_size + sizeof(*params)) && (PopCursor - Buf < message_size)) ||
-			((PushCursor == PopCursor) && (((MessageParameters *)PopCursor)->NextMessage != NULL)))
-		{
-			char *new_buf = new char[BufSize * 2];
-			ZeroMemory(new_buf, BufSize * 2);
-
-			if(PushCursor > PopCursor)
-			{
-				memcpy(new_buf, Buf, BufSize);		
-
-				PopCursor = new_buf + (PopCursor - Buf);
-				PushCursor = new_buf + (PushCursor - Buf);
-
-				MessageParameters *temp = (MessageParameters *)PopCursor;
-				while(temp->NextMessage)
-				{
-					temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf));
-					temp = temp->NextMessage;
-				}
-			}
-			else
-			{
-				memcpy(new_buf, Buf, PushCursor - Buf);
-				memcpy(new_buf + BufSize + (PopCursor - Buf), PopCursor, BufSize - (PopCursor - Buf));
-
-				MessageParameters *OldPushCursor = (MessageParameters *)PushCursor;
-				PopCursor = new_buf + (PopCursor - Buf) + BufSize;
-				PushCursor = new_buf + (PushCursor - Buf);
-
-				MessageParameters *temp = (MessageParameters *)PopCursor;
-				while(temp->NextMessage)
-				{
-					if(temp->NextMessage <= OldPushCursor)
-						temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf));
-					else
-						temp->NextMessage = (MessageParameters *)(new_buf + ((char *)temp->NextMessage - Buf) + BufSize);
-					temp = temp->NextMessage;
-				}
-			}
-
-			delete[] Buf;
-			Buf = new_buf;
-			BufSize *= 2;
-		}
-
-		if(BufSize - (PushCursor - Buf) < message_size + sizeof(*params))
-		{
-			((MessageParameters *)PushCursor)->NextMessage = (MessageParameters *)Buf;
-			((MessageParameters *)PushCursor)->Redirector = true;
-			PushCursor = (char *)Buf;
-		}
-
-		cur = PushCursor;
-		PushCursor += message_size;
-
-		LeaveCriticalSection(&cs);
-
-		memcpy(cur, params, sizeof(*params));
-		memcpy(cur + sizeof(*params), message, params->BufferSize);
-		
-		EnterCriticalSection(&cs);
-		((MessageParameters *)cur)->NextMessage = (MessageParameters *)(cur + message_size);
-		LeaveCriticalSection(&cs);
-	}
-
-	VOID Pop(Buffer &dst)
-	{
-		MessageParameters params;
-
-		char *cur = NULL;
-
-		while(!cur)
-		{
-			EnterCriticalSection(&cs);
-			if(((MessageParameters *)PopCursor)->NextMessage)
-			{
-				cur = PopCursor;
-				if(((MessageParameters *)cur)->Redirector)
-				{
-					PopCursor = (char*)((MessageParameters *)PopCursor)->NextMessage;
-					cur = NULL;
-				}
-			}
-			LeaveCriticalSection(&cs);
-
-			if(!cur)
-				Sleep(0);
-		}
-
-		memcpy(&params, cur, sizeof(params));
-		dst.Resize(params.BufferSize);
-		memcpy(dst.GetPtr(), cur + sizeof(params), dst.GetDataSize());
-
-		EnterCriticalSection(&cs);
-		PopCursor = (char *)params.NextMessage;
-		LeaveCriticalSection(&cs);
+		if(MessageQueue)
+			delete MessageQueue;
 	}
 
 	DWORD Write(LPCVOID buf, size_t size)
@@ -207,6 +82,16 @@ struct LogFile
 
 		Close();
 		return 0;
+	}
+
+	void Push(const MessageHeader *header, const void *message, size_t message_size)
+	{
+		MessageQueue->Push(header, sizeof(*header), message, message_size);
+	}
+
+	void Pop(MessageHeader *header, Buffer &buffer)
+	{
+		MessageQueue->Pop(header, sizeof(*header), buffer);
 	}
 };
 
@@ -241,10 +126,11 @@ DWORD WINAPI LogThreadProc(PVOID context)
 	Buffer &buf = (log_file->ReplaceLF ? expanded_buf : raw_buf);
 
 	DWORD counter = 0;
+	MessageHeader header;
 
 	while(WaitForSingleObject(log_file->StopEvent, 0) != WAIT_OBJECT_0)
 	{
-		log_file->Pop(raw_buf);
+		log_file->Pop(&header, raw_buf);
 
 		// Replace LF -> CRLF
 		if(log_file->ReplaceLF)
@@ -296,21 +182,17 @@ LOG_API VOID LogStop()
 //
 LOG_API VOID LogWrite(const char *message)
 {
-	MessageParameters params;
-
-	params.BufferSize = strlen(message) * sizeof(char);
-	params.Unicode = false;
-	log_file.Push(&params, (const void *)message);
+	MessageHeader header;
+	header.Unicode = false;
+	log_file.Push(&header, (const void *)message, strlen(message) * sizeof(char));
 }
 
 
 //
 LOG_API VOID LogWrite(const wchar_t *message)
 {
-	MessageParameters params;
-
-	params.BufferSize = wcslen(message) * sizeof(wchar_t);
-	params.Unicode = true;
-	log_file.Push(&params, (const void *)message);
+	MessageHeader header;
+	header.Unicode = true;
+	log_file.Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
 }
 

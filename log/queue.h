@@ -1,11 +1,14 @@
+#ifndef _QUEUE_H
+#define _QUEUE_H
+
 #include <Windows.h>
 #include "misc.h"
 
 class Queue
 {
 public:
-	virtual void Push(void *buffer, size_t size) = 0;
-	virtual void Pop(Buffer &buffer) = 0;
+	virtual void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2) = 0;
+	virtual void Pop(void *header, size_t header_size, Buffer &buffer) = 0;
 };
 
 class WinApiPipe: public Queue
@@ -16,8 +19,8 @@ class WinApiPipe: public Queue
 public:
 	WinApiPipe(size_t buffer_size);
 	~WinApiPipe();
-	void Push(void *buffer, size_t size);
-	void Pop(Buffer &buffer);
+	void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2);
+	void Pop(void *header, size_t header_size, Buffer &buffer);
 };
 
 class RingBuffer: public Queue
@@ -31,6 +34,8 @@ class RingBuffer: public Queue
 public:
 	RingBuffer(size_t buffer_size);
 	~RingBuffer();
-	void Push(void *buffer, size_t size);
-	void Pop(Buffer &buffer);
+	void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2);
+	void Pop(void *header, size_t header_size, Buffer &buffer);
 };
+
+#endif

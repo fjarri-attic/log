@@ -17,21 +17,26 @@ WinApiPipe::~WinApiPipe()
 	DeleteCriticalSection(&CS);
 }
 
-void WinApiPipe::Push(void *buffer, size_t size)
+void WinApiPipe::Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2)
 {
 	DWORD dw;
+	size_t size = size1 + size2;
 	EnterCriticalSection(&CS);
 	WriteFile(WriteEnd, &size, sizeof(size_t), &dw, NULL);
-	WriteFile(WriteEnd, buffer, (DWORD)size, &dw, NULL);
+	WriteFile(WriteEnd, buffer1, (DWORD)size1, &dw, NULL);
+	if(size2)
+		WriteFile(WriteEnd, buffer2, (DWORD)size2, &dw, NULL);
 	LeaveCriticalSection(&CS);
 }
 
-void WinApiPipe::Pop(Buffer &buffer)
+void WinApiPipe::Pop(void *header, size_t header_size, Buffer &buffer)
 {
 	DWORD dw;
 	size_t size;
 	ReadFile(ReadEnd, &size, sizeof(size_t), &dw, NULL);
-	buffer.Resize(size);
+	if(header_size)
+		ReadFile(ReadEnd, header, (DWORD)header_size, &dw, NULL);
+	buffer.Resize(size - header_size);
 	ReadFile(ReadEnd, buffer.GetPtr(), (DWORD)size, &dw, NULL);
 }
 
@@ -64,11 +69,11 @@ RingBuffer::~RingBuffer()
 		delete[] Buf;
 }
 
-void RingBuffer::Push(void *buffer, size_t size)
+void RingBuffer::Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2)
 {
 	char *cur;
 
-	size_t total_size = sizeof(QueueElement) + size;
+	size_t total_size = sizeof(QueueElement) + size1 + size2;
 
 	EnterCriticalSection(&CS);
 	if(((PushCursor < PopCursor) && ((size_t)(PopCursor - PushCursor) < total_size)) ||
@@ -130,17 +135,18 @@ void RingBuffer::Push(void *buffer, size_t size)
 	LeaveCriticalSection(&CS);
 
 	QueueElement header;
-	((QueueElement *)cur)->BufferSize = size;
-	memcpy(cur + sizeof(QueueElement), buffer, size);
+	((QueueElement *)cur)->BufferSize = size1 + size2;
+	memcpy(cur + sizeof(QueueElement), buffer1, size1);
+	memcpy(cur + sizeof(QueueElement) + size1, buffer2, size2);
 
 	EnterCriticalSection(&CS);
 	((QueueElement *)cur)->Next = (QueueElement *)(cur + total_size);
 	LeaveCriticalSection(&CS);
 }
 
-void RingBuffer::Pop(Buffer &buffer)
+void RingBuffer::Pop(void *header, size_t header_size, Buffer &buffer)
 {
-	QueueElement params;
+	QueueElement *params;
 
 	char *cur = NULL;
 
@@ -162,10 +168,13 @@ void RingBuffer::Pop(Buffer &buffer)
 			Sleep(0);
 	}
 
-	buffer.Resize(((QueueElement *)cur)->BufferSize);
-	memcpy(buffer.GetPtr(), cur + sizeof(QueueElement), buffer.GetDataSize());
+	params = (QueueElement *)cur;
+	if(header_size)
+		memcpy(header, cur + sizeof(QueueElement), header_size);
+	buffer.Resize(((QueueElement *)cur)->BufferSize - header_size);
+	memcpy(buffer.GetPtr(), cur + sizeof(QueueElement) + header_size, buffer.GetDataSize());
 
 	EnterCriticalSection(&CS);
-	PopCursor = (char *)params.Next;
+	PopCursor = (char *)(params->Next);
 	LeaveCriticalSection(&CS);
 }
