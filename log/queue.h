@@ -22,6 +22,12 @@ public:
 
 class RingBuffer: public Queue
 {
+	CRITICAL_SECTION CS;
+	char *Buf;
+	size_t BufSize;
+
+	char *PushCursor;
+	char *PopCursor;
 public:
 	RingBuffer(size_t buffer_size);
 	~RingBuffer();
