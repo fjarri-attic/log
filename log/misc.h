@@ -15,7 +15,7 @@ public:
 	Buffer();
 	~Buffer();
 	void Free();
-	void Resize(size_t new_size);
+	void Resize(size_t new_size, bool keep_data = false);
 	void *GetPtr();
 	size_t GetDataSize();
 };

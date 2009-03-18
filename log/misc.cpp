@@ -5,6 +5,7 @@ Buffer::Buffer()
 {
 	Ptr = NULL;
 	Size = 0;
+	DataSize = 0;
 }
 
 Buffer::~Buffer()
@@ -21,15 +22,23 @@ void Buffer::Free()
 	}
 }
 
-void Buffer::Resize(size_t new_size)
+void Buffer::Resize(size_t new_size, bool keep_data)
 {
+	char *new_ptr = new char[new_size];
+	
+	if(keep_data)
+	{
+		size_t size_to_copy = (new_size > DataSize ? DataSize : new_size);
+		if(size_to_copy)
+			memcpy(new_ptr, Ptr, size_to_copy);
+	}
+
+	Free();
+
+	Ptr = new_ptr;
 	DataSize = new_size;
 	if(new_size > Size)
-	{
-		Free();
-		Ptr = new char[new_size];
 		Size = new_size;
-	}
 }
 
 void *Buffer::GetPtr()
@@ -41,6 +50,7 @@ size_t Buffer::GetDataSize()
 {
 	return DataSize;
 }
+
 
 //
 void ExpandLF(Buffer &src_buf, Buffer &dst_buf)
