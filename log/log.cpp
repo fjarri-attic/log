@@ -149,27 +149,41 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     return TRUE;
 }
 
+void SwapBuffers(Buffer *&buf1, Buffer *&buf2)
+{
+	Buffer *temp = buf1;
+	buf1 = buf2;
+	buf2 = temp;
+}
+
 //
 DWORD WINAPI LogThreadProc(PVOID context)
 {
 	LogFile *lf = (LogFile *)context;
 	DWORD res;
 
-	Buffer raw_buf, expanded_buf;
-	Buffer &buf = (log_file->ReplaceLF ? expanded_buf : raw_buf);
+	Buffer buf1, buf2;
 
 	DWORD counter = 0;
 	MessageHeader header;
 
 	while(WaitForSingleObject(log_file->StopEvent, 0) != WAIT_OBJECT_0)
 	{
-		lf->Pop(&header, raw_buf);
+		Buffer *primary_buf = &buf1;
+		Buffer *secondary_buf = &buf2;
+
+		lf->Pop(&header, *primary_buf);
+
+		if(header.Unicode)
+			UnicodeToMbStr(*primary_buf, *secondary_buf);
+		SwapBuffers(primary_buf, secondary_buf);
 
 		// Replace LF -> CRLF
 		if(log_file->ReplaceLF)
-			ExpandLF(raw_buf, expanded_buf);
+			ExpandLF(*primary_buf, *secondary_buf);
+		SwapBuffers(primary_buf, secondary_buf);
 
-		res = lf->Write(buf.GetPtr(), buf.GetDataSize());
+		res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize());
 		if(res)
 			return res;
 
