@@ -54,7 +54,7 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 }
 
 LogFile::LogFile( const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed ) : 
-MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
+	MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
 {
 	ReplaceLF = true;
 	StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);

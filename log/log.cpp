@@ -4,12 +4,7 @@
 #include <Windows.h>
 #include <tchar.h>
 #include "log.h"
-#include "misc.h"
-#include "queue.h"
-#include "file.h"
 #include "logfile.h"
-
-#include <stdio.h>
 
 LogFilesPool Pool;
 
