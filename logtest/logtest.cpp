@@ -51,7 +51,7 @@ int _tmain(int argc, TCHAR *argv[])
 {
 	LoadLibrary(_T("log.dll"));
 
-	if(LogInit(0, argv[1]))
+	if(LogStart(0, argv[1]))
 		return 1;
 
 	stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);

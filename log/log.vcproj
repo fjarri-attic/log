@@ -20,7 +20,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="2"
+			CharacterSet="1"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -46,7 +46,7 @@
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				WarnAsError="false"
+				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
@@ -184,15 +184,15 @@
 				>
 			</File>
 			<File
-				RelativePath=".\logfile.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\misc.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\queue.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\rawlog.cpp"
 				>
 			</File>
 		</Filter>
@@ -210,15 +210,15 @@
 				>
 			</File>
 			<File
-				RelativePath=".\logfile.h"
-				>
-			</File>
-			<File
 				RelativePath=".\misc.h"
 				>
 			</File>
 			<File
 				RelativePath=".\queue.h"
+				>
+			</File>
+			<File
+				RelativePath=".\rawlog.h"
 				>
 			</File>
 		</Filter>

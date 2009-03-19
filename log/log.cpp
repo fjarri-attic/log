@@ -4,7 +4,7 @@
 #include <Windows.h>
 #include <tchar.h>
 #include "log.h"
-#include "logfile.h"
+#include "rawlog.h"
 
 LogFilesPool Pool;
 
@@ -26,19 +26,19 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 }
 
 //
-int LogInitInternal(size_t index, const void *file_name, bool unicode)
+int LogStartInternal(size_t index, const void *file_name, bool unicode)
 {
 	return Pool.Start(index, file_name, unicode, 1024 * 1024, true);
 }
 
-LOG_API int LogInitA(size_t index, const char *file_name)
+LOG_API int LogStartA(size_t index, const char *file_name)
 {
-	return LogInitInternal(index, file_name, false);
+	return LogStartInternal(index, file_name, false);
 }
 
-LOG_API int LogInitW(size_t index, const wchar_t *file_name)
+LOG_API int LogStartW(size_t index, const wchar_t *file_name)
 {
-	return LogInitInternal(index, file_name, true);
+	return LogStartInternal(index, file_name, true);
 }
 
 LOG_API VOID LogStop(size_t index)
