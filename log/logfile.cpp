@@ -53,7 +53,7 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 	return 0;
 }
 
-LogFile::LogFile( const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed ) : 
+LogFile::LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed) : 
 	MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
 {
 	ReplaceLF = true;
@@ -66,17 +66,17 @@ LogFile::~LogFile()
 		CloseHandle(StopEvent);
 }
 
-DWORD LogFile::Write( LPCVOID buf, size_t size )
+int LogFile::Write(const void *buf, size_t size)
 {
 	return TargetFile.Write(buf, size);
 }
 
-void LogFile::Push( const MessageHeader *header, const void *message, size_t message_size )
+void LogFile::Push(const MessageHeader *header, const void *message, size_t message_size)
 {
 	MessageQueue.Push(header, sizeof(*header), message, message_size);
 }
 
-void LogFile::Pop( MessageHeader *header, Buffer &buffer )
+void LogFile::Pop(MessageHeader *header, Buffer &buffer)
 {
 	MessageQueue.Pop(header, sizeof(*header), buffer);
 }
@@ -86,6 +86,7 @@ void LogFile::Stop()
 	SetEvent(StopEvent);
 	if(WaitForSingleObject(LoggerThread, 10000) == WAIT_TIMEOUT)
 	{
+		_ftprintf(stderr, _T("Logging thread timeouted, terminating\n"));
 		TerminateThread(LoggerThread, (DWORD)-1);
 	}
 }
@@ -93,15 +94,18 @@ void LogFile::Stop()
 int LogFile::Start()
 {
 	DWORD dw;
+
 	// Create logging thread
 	LoggerThread = CreateThread(NULL, 0, LogThreadProc, (PVOID)this, 0, &dw);
 	if(LoggerThread == INVALID_HANDLE_VALUE)
-		return GetLastError();
+	{
+		int err = GetLastError();
+		_ftprintf(stderr, _T("Failed to create logging thread\n"));
+		return err;
+	}
 
 	return 0;
 }
-
-
 
 
 LogFilesPool::~LogFilesPool()
@@ -117,7 +121,7 @@ LogFilesPool::~LogFilesPool()
 	}
 }
 
-int LogFilesPool::Start( size_t index, const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed )
+int LogFilesPool::Start(size_t index, const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed)
 {
 	if(index >= LogFiles.GetDataSize() / sizeof(LogFile *))
 		LogFiles.Resize((index + 1) * sizeof(LogFile *), true);
@@ -131,12 +135,9 @@ int LogFilesPool::Start( size_t index, const void *file_name, bool name_is_unico
 	return new_lf->Start();
 }
 
-void LogFilesPool::Stop( size_t index )
+void LogFilesPool::Stop(size_t index)
 {
-	if(index > LogFiles.GetDataSize() / sizeof(LogFile *))
-		return;
-
-	LogFile *lf = (LogFile *)LogFiles.GetPtr() + index;
+	LogFile *lf = Get(index);
 
 	if(lf)
 	{
@@ -146,10 +147,13 @@ void LogFilesPool::Stop( size_t index )
 	}
 }
 
-LogFile * LogFilesPool::Get( size_t index )
+LogFile * LogFilesPool::Get(size_t index)
 {
 	if(index >= LogFiles.GetDataSize() / sizeof(LogFile *))
+	{
+		_ftprintf(stderr, _T("Log file index out of range: %d\n"), index);
 		return NULL;
+	}
 
 	return *((LogFile **)LogFiles.GetPtr() + index);
 }

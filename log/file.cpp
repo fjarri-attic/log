@@ -1,7 +1,9 @@
+#include <tchar.h>
+#include <stdio.h>
+
 #include "file.h"
 
-
-File::File( const void *file_name, bool name_is_unicode, bool keep_closed )
+File::File(const void *file_name, bool name_is_unicode, bool keep_closed)
 {
 	size_t buffer_size;
 
@@ -38,7 +40,11 @@ int File::Open()
 			FileHandle = CreateFileA((char *)FileName, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
 		if(FileHandle == INVALID_HANDLE_VALUE) 
-			return GetLastError();
+		{
+			int err = GetLastError();
+			_ftprintf(stderr, _T("Failed to create log file: error %d\n"), err);
+			return err;
+		}
 	}
 
 	return 0;
@@ -53,7 +59,7 @@ void File::Close()
 	}
 }
 
-int File::Write( const void *buffer, size_t buffer_size )
+int File::Write(const void *buffer, size_t buffer_size)
 {
 	DWORD res = Open();
 	if(res)
@@ -62,8 +68,10 @@ int File::Write( const void *buffer, size_t buffer_size )
 	DWORD size_written;
 	if(!WriteFile(FileHandle, buffer, (DWORD)buffer_size, &size_written, NULL) || size_written != (DWORD)buffer_size)
 	{
+		int err = GetLastError();
+		_ftprintf(stderr, _T("Failed to write to log file: error %d\n"), err);
 		Close();
-		return GetLastError();
+		return err;
 	}
 
 	Close();

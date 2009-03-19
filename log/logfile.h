@@ -24,7 +24,7 @@ public:
 	LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed);
 	~LogFile();
 
-	DWORD Write(LPCVOID buf, size_t size);
+	int Write(const void *buf, size_t size);
 	void Push(const MessageHeader *header, const void *message, size_t message_size);
 	void Pop(MessageHeader *header, Buffer &buffer);
 	void Stop();
