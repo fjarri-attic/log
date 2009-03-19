@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <tchar.h>
+#include <stdio.h>
 #include "misc.h"
 
 Buffer::Buffer() 
@@ -115,14 +117,22 @@ int UnicodeToMbStr(const Buffer &src, Buffer &dst)
 
 	// if failed, return, doing nothing
 	if(!t)
-		return GetLastError();
+	{
+		int err = GetLastError();
+		_ftprintf(stderr, _T("Failed to get necessary buffer size for conversion from Unicode to Ansi: error %d\n"), err);
+		return err;
+	}
 
 	// allocate buffer for resulting string
 	dst.Resize(t);
 
 	// perform conversion
 	if(!WideCharToMultiByte(CP_THREAD_ACP, 0, (LPCWSTR)src.GetPtr(), -1, (LPSTR)dst.GetPtr(), t, NULL, NULL))
-		return GetLastError();
+	{
+		int err = GetLastError();
+		_ftprintf(stderr, _T("Failed to convert string from Unicode to Ansi: error %d\n"), err);
+		return err;
+	}
 
 	return 0;
 }
