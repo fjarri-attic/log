@@ -44,19 +44,19 @@ void Buffer::Resize(size_t new_size, bool keep_data)
 		Size = new_size;
 }
 
-void *Buffer::GetPtr()
+void *Buffer::GetPtr() const
 {
 	return (void *)Ptr;
 }
 
-size_t Buffer::GetDataSize()
+size_t Buffer::GetDataSize() const 
 {
 	return DataSize;
 }
 
 
 //
-void ExpandLF(Buffer &src_buf, Buffer &dst_buf)
+void ExpandLF(const Buffer &src_buf, Buffer &dst_buf)
 {
 	char *src = (char*)src_buf.GetPtr();
 	size_t src_len = src_buf.GetDataSize();
@@ -100,7 +100,7 @@ void ExpandLF(Buffer &src_buf, Buffer &dst_buf)
 
 
 //
-int UnicodeToMbStr(Buffer &src, Buffer &dst)
+int UnicodeToMbStr(const Buffer &src, Buffer &dst)
 {
 	int t;
 

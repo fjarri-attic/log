@@ -12,11 +12,11 @@ public:
 	~Buffer();
 	void Free();
 	void Resize(size_t new_size, bool keep_data = false);
-	void *GetPtr();
-	size_t GetDataSize();
+	void *GetPtr() const;
+	size_t GetDataSize() const;
 };
 
-void ExpandLF(Buffer &src_buf, Buffer &dst_buf);
-int UnicodeToMbStr(Buffer &src, Buffer &dst);
+void ExpandLF(const Buffer &src_buf, Buffer &dst_buf);
+int UnicodeToMbStr(const Buffer &src, Buffer &dst);
 
 #endif
