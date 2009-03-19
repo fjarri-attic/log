@@ -236,8 +236,6 @@ public:
 		LogFile *new_lf = new LogFile(file_name, name_is_unicode, buffer_size, keep_closed);
 		*lf = new_lf;
 
-		LogFile *zzz = Get(index);
-
 		return new_lf->Start();
 	}
 
@@ -306,20 +304,26 @@ LOG_API VOID LogStop(size_t index)
 
 }
 
+VOID LogWriteInternal(size_t index, const void *message, size_t size, bool unicode)
+{
+	MessageHeader header;
+	header.Unicode = unicode;
+
+	LogFile *lf = Pool.Get(index);
+	if(lf)
+		Pool.Get(index)->Push(&header, message, size);
+}
+
 //
 LOG_API VOID LogWriteA(size_t index, const char *message)
 {
-	MessageHeader header;
-	header.Unicode = false;
-	Pool.Get(index)->Push(&header, (const void *)message, strlen(message) * sizeof(char));
+	LogWriteInternal(index, (const void *)message, strlen(message) * sizeof(char), false);
 }
 
 
 //
 LOG_API VOID LogWriteW(size_t index, const wchar_t *message)
 {
-	MessageHeader header;
-	header.Unicode = true;
-	Pool.Get(index)->Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
+	LogWriteInternal(index, (const void *)message, wcslen(message) * sizeof(wchar_t), true);
 }
 
