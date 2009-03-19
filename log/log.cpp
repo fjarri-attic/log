@@ -15,10 +15,9 @@ struct MessageHeader
 	bool Unicode;
 };
 
-
-
-struct LogFile
+class LogFile
 {
+private:
 	bool ReplaceLF;
 
 	HANDLE StopEvent;
@@ -27,6 +26,7 @@ struct LogFile
 	Queue MessageQueue;
 	File TargetFile;
 
+public:
 	LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed) : 
 		MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
 	{ 
@@ -74,6 +74,8 @@ struct LogFile
 
 		return 0;
 	}
+
+	static DWORD WINAPI LogThreadProc(PVOID context);
 };
 
 
@@ -85,7 +87,7 @@ void SwapBuffers(Buffer *&buf1, Buffer *&buf2)
 }
 
 //
-DWORD WINAPI LogThreadProc(PVOID context)
+DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 {
 	LogFile *lf = (LogFile *)context;
 	DWORD res;
