@@ -96,12 +96,14 @@ int File::Write( const void *buffer, size_t buffer_size )
 	Close();
 	return 0;
 }
+
+
 struct LogFile
 {
-	BOOLEAN KeepClosed;
-	BOOLEAN ReplaceLF;
+	bool ReplaceLF;
 
 	HANDLE StopEvent;
+	HANDLE LoggerThread;
 
 	Queue MessageQueue;
 	File TargetFile;
@@ -109,7 +111,7 @@ struct LogFile
 	LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed) : 
 		MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
 	{ 
-		ReplaceLF = TRUE;
+		ReplaceLF = true;
 		StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	}
 
@@ -133,26 +135,28 @@ struct LogFile
 	{
 		MessageQueue.Pop(header, sizeof(*header), buffer);
 	}
+
+	void Stop()
+	{
+		SetEvent(StopEvent);
+		if(WaitForSingleObject(LoggerThread, 10000) == WAIT_TIMEOUT)
+		{
+			TerminateThread(LoggerThread, (DWORD)-1);
+		}
+	}
+
+	int Start()
+	{
+		DWORD dw;
+		// Create logging thread
+		LoggerThread = CreateThread(NULL, 0, LogThreadProc, (PVOID)this, 0, &dw);
+		if(LoggerThread == INVALID_HANDLE_VALUE)
+			return GetLastError();
+
+		return 0;
+	}
 };
 
-LogFile *log_file;
-
-//
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
-{
-	UNREFERENCED_PARAMETER(hModule);
-	UNREFERENCED_PARAMETER(lpReserved);
-
-	switch (ul_reason_for_call)
-	{
-	case DLL_PROCESS_ATTACH:
-	case DLL_THREAD_ATTACH:
-	case DLL_THREAD_DETACH:
-	case DLL_PROCESS_DETACH:
-		break;
-	}
-    return TRUE;
-}
 
 void SwapBuffers(Buffer *&buf1, Buffer *&buf2)
 {
@@ -172,7 +176,7 @@ DWORD WINAPI LogThreadProc(PVOID context)
 	DWORD counter = 0;
 	MessageHeader header;
 
-	while(WaitForSingleObject(log_file->StopEvent, 0) != WAIT_OBJECT_0)
+	while(WaitForSingleObject(lf->StopEvent, 0) != WAIT_OBJECT_0)
 	{
 		Buffer *primary_buf = &buf1;
 		Buffer *secondary_buf = &buf2;
@@ -184,7 +188,7 @@ DWORD WINAPI LogThreadProc(PVOID context)
 		SwapBuffers(primary_buf, secondary_buf);
 
 		// Replace LF -> CRLF
-		if(log_file->ReplaceLF)
+		if(lf->ReplaceLF)
 			ExpandLF(*primary_buf, *secondary_buf);
 		SwapBuffers(primary_buf, secondary_buf);
 
@@ -203,51 +207,119 @@ DWORD WINAPI LogThreadProc(PVOID context)
 }
 
 
+class LogFilesPool
+{
+	Buffer LogFiles;
+public:
+	LogFilesPool() {}
+	~LogFilesPool()
+	{
+		for(size_t i = 0; i < LogFiles.GetDataSize() / sizeof(LogFile *); i++)
+		{
+			LogFile *lf = Get(i);
+			if(lf != NULL)
+			{
+				lf->Stop();
+				delete lf;
+			}
+		}
+	}
+
+	int Start(size_t index, const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed)
+	{
+		if(index >= LogFiles.GetDataSize() / sizeof(LogFile *))
+			LogFiles.Resize((index + 1) * sizeof(LogFile *), true);
+		else
+			Stop(index);
+		
+		LogFile **lf = (LogFile **)LogFiles.GetPtr() + index;
+		LogFile *new_lf = new LogFile(file_name, name_is_unicode, buffer_size, keep_closed);
+		*lf = new_lf;
+
+		LogFile *zzz = Get(index);
+
+		return new_lf->Start();
+	}
+
+	void Stop(size_t index)
+	{
+		if(index > LogFiles.GetDataSize() / sizeof(LogFile *))
+			return;
+
+		LogFile *lf = (LogFile *)LogFiles.GetPtr() + index;
+
+		if(lf)
+		{
+			lf->Stop();
+			delete lf;
+			lf = NULL;
+		}
+	}
+
+	LogFile *Get(size_t index)
+	{
+		if(index >= LogFiles.GetDataSize() / sizeof(LogFile *))
+			return NULL;
+
+		return *((LogFile **)LogFiles.GetPtr() + index);
+	}
+};
+
+LogFilesPool Pool;
+
 //
-DWORD LogInitInternal(const void *file_name, bool unicode)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
-	DWORD dw;
+	UNREFERENCED_PARAMETER(hModule);
+	UNREFERENCED_PARAMETER(lpReserved);
 
-	// Create logfile
-	log_file = new LogFile(file_name, unicode, 1024 * 1024, true);
-
-	// Create logging thread
-	HANDLE logger_thread = CreateThread(NULL, 0, LogThreadProc, (PVOID)log_file, 0, &dw);
-	if(logger_thread == INVALID_HANDLE_VALUE)
-		return GetLastError();
-
-	return 0;
-}
-
-LOG_API DWORD LogInitA(const char *file_name)
-{
-	return LogInitInternal(file_name, false);
-}
-
-LOG_API DWORD LogInitW(const wchar_t *file_name)
-{
-	return LogInitInternal(file_name, true);
-}
-
-LOG_API VOID LogStop()
-{
-	SetEvent(log_file->StopEvent);
+	switch (ul_reason_for_call)
+	{
+	case DLL_PROCESS_ATTACH:
+	case DLL_THREAD_ATTACH:
+	case DLL_THREAD_DETACH:
+	case DLL_PROCESS_DETACH:
+		break;
+	}
+    return TRUE;
 }
 
 //
-LOG_API VOID LogWriteA(const char *message)
+int LogInitInternal(size_t index, const void *file_name, bool unicode)
+{
+	return Pool.Start(index, file_name, unicode, 1024 * 1024, true);
+}
+
+LOG_API int LogInitA(size_t index, const char *file_name)
+{
+	return LogInitInternal(index, file_name, false);
+}
+
+LOG_API int LogInitW(size_t index, const wchar_t *file_name)
+{
+	return LogInitInternal(index, file_name, true);
+}
+
+LOG_API VOID LogStop(size_t index)
+{
+	Pool.Get(index)->Stop();	
+
+}
+
+//
+LOG_API VOID LogWriteA(size_t index, const char *message)
 {
 	MessageHeader header;
 	header.Unicode = false;
-	log_file->Push(&header, (const void *)message, strlen(message) * sizeof(char));
+	Pool.Get(index)->Push(&header, (const void *)message, strlen(message) * sizeof(char));
 }
 
 
 //
-LOG_API VOID LogWriteW(const wchar_t *message)
+LOG_API VOID LogWriteW(size_t index, const wchar_t *message)
 {
 	MessageHeader header;
 	header.Unicode = true;
-	log_file->Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
+	Pool.Get(index)->Push(&header, (const void *)message, wcslen(message) * sizeof(wchar_t));
 }
 

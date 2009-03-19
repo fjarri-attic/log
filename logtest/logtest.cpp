@@ -26,7 +26,7 @@ DWORD WINAPI TesterThread(PVOID context)
 		count ++;
 		QueryPerformanceFrequency(&freq);
 		QueryPerformanceCounter(&time1);
-		LogWrite(str);
+		LogWrite(0, str);
 		QueryPerformanceCounter(&time2);
 
 		DWORD t = (time2.QuadPart - time1.QuadPart) * 1000000 / freq.QuadPart;
@@ -51,7 +51,7 @@ int _tmain(int argc, TCHAR *argv[])
 {
 	LoadLibrary(_T("log.dll"));
 
-	if(LogInit(argv[1]))
+	if(LogInit(0, argv[1]))
 		return 1;
 
 	stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -66,7 +66,7 @@ int _tmain(int argc, TCHAR *argv[])
 
 	Sleep(10000);
 	SetEvent(stop_event);
-	LogStop();
+	LogStop(0);
 	WaitForMultipleObjects(10, threads, TRUE, INFINITE);
 
 	return 0;

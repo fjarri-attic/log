@@ -5,11 +5,12 @@
 #define LOG_API __declspec(dllimport)
 #endif
 
-LOG_API DWORD LogInitA(const char *file_name);
-LOG_API DWORD LogInitW(const wchar_t *file_name);
-LOG_API VOID LogWriteA(const char *message);
-LOG_API VOID LogWriteW(const wchar_t *message);
-LOG_API VOID LogStop();
+DWORD WINAPI LogThreadProc(PVOID context);
+LOG_API int LogInitA(size_t index, const char *file_name);
+LOG_API int LogInitW(size_t index, const wchar_t *file_name);
+LOG_API VOID LogWriteA(size_t index, const char *message);
+LOG_API VOID LogWriteW(size_t index, const wchar_t *message);
+LOG_API VOID LogStop(size_t index);
 
 #ifdef UNICODE
 #define LogInit LogInitW
