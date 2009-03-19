@@ -27,6 +27,7 @@ void Buffer::Free()
 void Buffer::Resize(size_t new_size, bool keep_data)
 {
 	char *new_ptr = new char[new_size];
+	ZeroMemory(new_ptr, new_size);
 	
 	if(keep_data)
 	{
