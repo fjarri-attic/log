@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
-#include "..\log\log.h"
+#include "..\rawlog\rawlog.h"
 
 HANDLE stop_event;
 
@@ -26,7 +26,7 @@ DWORD WINAPI TesterThread(PVOID context)
 		count ++;
 		QueryPerformanceFrequency(&freq);
 		QueryPerformanceCounter(&time1);
-		LogWrite(0, str);
+		RawLogWrite(0, str);
 		QueryPerformanceCounter(&time2);
 
 		DWORD t = (time2.QuadPart - time1.QuadPart) * 1000000 / freq.QuadPart;
@@ -51,7 +51,7 @@ int _tmain(int argc, TCHAR *argv[])
 {
 	LoadLibrary(_T("log.dll"));
 
-	if(LogStart(0, argv[1]))
+	if(RawLogStart(0, argv[1]))
 		return 1;
 
 	stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -66,7 +66,7 @@ int _tmain(int argc, TCHAR *argv[])
 
 	Sleep(10000);
 	SetEvent(stop_event);
-	LogStop(0);
+	RawLogStop(0);
 	WaitForMultipleObjects(10, threads, TRUE, INFINITE);
 
 	return 0;

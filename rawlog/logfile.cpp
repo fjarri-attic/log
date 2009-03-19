@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include "misc.h"
-#include "rawlog.h"
+#include "logfile.h"
 
 void SwapBuffers(Buffer *&buf1, Buffer *&buf2)
 {
