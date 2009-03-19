@@ -1,10 +1,6 @@
 #ifndef _MISC_H
 #define _MISC_H
 
-#include <stdlib.h>
-#include <memory.h>
-#include <Windows.h>
-
 class Buffer
 {
 private:
@@ -21,6 +17,6 @@ public:
 };
 
 void ExpandLF(Buffer &src_buf, Buffer &dst_buf);
-DWORD UnicodeToMbStr(Buffer &src, Buffer &dst);
+int UnicodeToMbStr(Buffer &src, Buffer &dst);
 
 #endif

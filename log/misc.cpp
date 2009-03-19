@@ -1,5 +1,7 @@
-#include "misc.h"
 #include <Windows.h>
+#include <stdlib.h>
+#include <memory.h>
+#include "misc.h"
 
 Buffer::Buffer() 
 {
@@ -97,7 +99,7 @@ void ExpandLF(Buffer &src_buf, Buffer &dst_buf)
 
 
 //
-DWORD UnicodeToMbStr(Buffer &src, Buffer &dst)
+int UnicodeToMbStr(Buffer &src, Buffer &dst)
 {
 	int t;
 
