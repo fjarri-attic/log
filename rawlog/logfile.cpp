@@ -31,13 +31,17 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 		lf->Pop(&header, *primary_buf);
 
 		if(header.Unicode)
+		{
 			UnicodeToMbStr(*primary_buf, *secondary_buf);
-		SwapBuffers(primary_buf, secondary_buf);
+			SwapBuffers(primary_buf, secondary_buf);
+		}
 
 		// Replace LF -> CRLF
 		if(lf->ReplaceLF)
+		{
 			ExpandLF(*primary_buf, *secondary_buf);
-		SwapBuffers(primary_buf, secondary_buf);
+			SwapBuffers(primary_buf, secondary_buf);
+		}
 
 		res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize());
 		if(res)
