@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 9.00
 # Visual Studio 2005
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "logtest", "logtest\logtest.vcproj", "{98E0830F-4889-4089-B4AF-B0E0C04E88A2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rawlogtest", "rawlogtest\rawlogtest.vcproj", "{98E0830F-4889-4089-B4AF-B0E0C04E88A2}"
 	ProjectSection(ProjectDependencies) = postProject
 		{F7565F5C-26DF-4339-83A7-656F7509EB50} = {F7565F5C-26DF-4339-83A7-656F7509EB50}
 	EndProjectSection
