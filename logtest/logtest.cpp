@@ -3,17 +3,11 @@
 #include <stdio.h>
 #include "..\log\log.h"
 
-enum LogFilesEnum
-{
-	MainLogFile,
-	SystemLogFile
-};
-
-#define SystemLog (Log << SystemLogFile)
-#define MainLog (Log << MainLogFile)
-
 int _tmain(int argc, TCHAR *argv[])
 {
+	RawLogStart(0, _T("debug.log"));
+	DebugLogger(__FILE__, __LINE__).get() << "Test\n" << "TTT\n";
+	RawLogStop(0);
 /*
 	Log.Init(MainLog, "mainlog.txt");
 	Log.Init(SystemLog, "systemlog.txt");
@@ -23,7 +17,7 @@ int _tmain(int argc, TCHAR *argv[])
 		<< Header << "Header"
 		<< Message << "Message after header";
 
-	MainLog << Warning << "Warning";		
+	MainLog << Warning << "Warning";	
 */
 	return 0;
 }

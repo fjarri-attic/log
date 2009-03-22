@@ -157,6 +157,10 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\basic_debuglog_stream.h"
+				>
+			</File>
+			<File
 				RelativePath=".\log.h"
 				>
 			</File>
