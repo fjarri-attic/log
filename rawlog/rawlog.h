@@ -1,3 +1,5 @@
+#ifndef _RAWLOG_H
+#define _RAWLOG_H
 
 int RawLogStartA(size_t index, const char *file_name);
 int RawLogStartW(size_t index, const wchar_t *file_name);
@@ -11,4 +13,6 @@ VOID RawLogStop(size_t index);
 #else
 #define RawLogStart RawLogStartA
 #define RawLogWrite RawLogWriteA
+#endif
+
 #endif
