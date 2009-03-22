@@ -3,9 +3,9 @@
 
 int RawLogStartA(size_t index, const char *file_name);
 int RawLogStartW(size_t index, const wchar_t *file_name);
-VOID RawLogWriteA(size_t index, const char *message);
-VOID RawLogWriteW(size_t index, const wchar_t *message);
-VOID RawLogStop(size_t index);
+void RawLogWriteA(size_t index, const char *message);
+void RawLogWriteW(size_t index, const wchar_t *message);
+void RawLogStop(size_t index);
 
 #ifdef UNICODE
 #define RawLogStart RawLogStartW
