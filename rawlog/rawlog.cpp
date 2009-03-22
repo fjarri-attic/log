@@ -43,13 +43,13 @@ VOID RawLogWriteInternal(size_t index, const void *message, size_t size, bool un
 //
 VOID RawLogWriteA(size_t index, const char *message)
 {
-	RawLogWriteInternal(index, (const void *)message, strlen(message) * sizeof(char), false);
+	RawLogWriteInternal(index, (const void *)message, (strlen(message) + 1) * sizeof(char), false);
 }
 
 
 //
 VOID RawLogWriteW(size_t index, const wchar_t *message)
 {
-	RawLogWriteInternal(index, (const void *)message, wcslen(message) * sizeof(wchar_t), true);
+	RawLogWriteInternal(index, (const void *)message, (wcslen(message) + 1) * sizeof(wchar_t), true);
 }
 

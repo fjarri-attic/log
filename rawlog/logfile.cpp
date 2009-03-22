@@ -43,7 +43,8 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 			SwapBuffers(primary_buf, secondary_buf);
 		}
 
-		res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize());
+		// Write string without ending zero symbol
+		res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize() - 1);
 		if(res)
 			return res;
 
@@ -121,6 +122,7 @@ LogFilesPool::~LogFilesPool()
 		{
 			lf->Stop();
 			delete lf;
+			lf = NULL;
 		}
 	}
 }
