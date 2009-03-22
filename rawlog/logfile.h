@@ -17,6 +17,8 @@ private:
 	HANDLE StopEvent;
 	HANDLE LoggerThread;
 
+	bool Running; // FIXME: make setting/unsetting of this variable thread-safe
+
 	Queue MessageQueue;
 	File TargetFile;
 

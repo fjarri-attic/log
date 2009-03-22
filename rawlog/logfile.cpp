@@ -61,6 +61,7 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 LogFile::LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed) : 
 	MessageQueue(buffer_size), TargetFile(file_name, name_is_unicode, keep_closed)
 {
+	Running = false;
 	ReplaceLF = true;
 	StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
@@ -88,25 +89,31 @@ void LogFile::Pop(MessageHeader *header, Buffer &buffer)
 
 void LogFile::Stop()
 {
-	SetEvent(StopEvent);
-	if(WaitForSingleObject(LoggerThread, 10000) == WAIT_TIMEOUT)
+	if(Running)
 	{
-		_ftprintf(stderr, _T("Logging thread timeouted, terminating\n"));
-		TerminateThread(LoggerThread, (DWORD)-1);
+		SetEvent(StopEvent);
+		if(WaitForSingleObject(LoggerThread, 10000) == WAIT_TIMEOUT)
+		{
+			_ftprintf(stderr, _T("Logging thread timeouted, terminating\n"));
+			TerminateThread(LoggerThread, (DWORD)-1);
+		}
 	}
 }
 
 int LogFile::Start()
 {
-	DWORD dw;
-
-	// Create logging thread
-	LoggerThread = CreateThread(NULL, 0, LogThreadProc, (PVOID)this, 0, &dw);
-	if(LoggerThread == INVALID_HANDLE_VALUE)
+	if(!Running)
 	{
-		int err = GetLastError();
-		_ftprintf(stderr, _T("Failed to create logging thread\n"));
-		return err;
+		DWORD dw;
+
+		// Create logging thread
+		LoggerThread = CreateThread(NULL, 0, LogThreadProc, (PVOID)this, 0, &dw);
+		if(LoggerThread == INVALID_HANDLE_VALUE)
+		{
+			int err = GetLastError();
+			_ftprintf(stderr, _T("Failed to create logging thread\n"));
+			return err;
+		}
 	}
 
 	return 0;
