@@ -97,6 +97,8 @@ void LogFile::Stop()
 			_ftprintf(stderr, _T("Logging thread timeouted, terminating\n"));
 			TerminateThread(LoggerThread, (DWORD)-1);
 		}
+
+		Running = false;
 	}
 }
 
@@ -114,6 +116,8 @@ int LogFile::Start()
 			_ftprintf(stderr, _T("Failed to create logging thread\n"));
 			return err;
 		}
+
+		Running = true;
 	}
 
 	return 0;
