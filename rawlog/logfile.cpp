@@ -28,7 +28,11 @@ DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 		Buffer *primary_buf = &buf1;
 		Buffer *secondary_buf = &buf2;
 
-		lf->Pop(&header, *primary_buf);
+		if(!lf->Pop(&header, *primary_buf))
+		{
+			Sleep(0);
+			continue;
+		}
 
 		if(header.Unicode)
 		{
@@ -82,9 +86,9 @@ void LogFile::Push(const MessageHeader *header, const void *message, size_t mess
 	MessageQueue.Push(header, sizeof(*header), message, message_size);
 }
 
-void LogFile::Pop(MessageHeader *header, Buffer &buffer)
+bool LogFile::Pop(MessageHeader *header, Buffer &buffer)
 {
-	MessageQueue.Pop(header, sizeof(*header), buffer);
+	return MessageQueue.Pop(header, sizeof(*header), buffer);
 }
 
 void LogFile::Stop()

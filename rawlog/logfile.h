@@ -28,7 +28,7 @@ public:
 
 	int Write(const void *buf, size_t size);
 	void Push(const MessageHeader *header, const void *message, size_t message_size);
-	void Pop(MessageHeader *header, Buffer &buffer);
+	bool Pop(MessageHeader *header, Buffer &buffer);
 	void Stop();
 	int Start();
 	static DWORD WINAPI LogThreadProc(PVOID context);

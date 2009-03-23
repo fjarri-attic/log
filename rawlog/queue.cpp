@@ -103,7 +103,7 @@ void Queue::Push(const void *buffer1, size_t size1, const void *buffer2, size_t 
 	LeaveCriticalSection(&CS);
 }
 
-void Queue::Pop(void *header, size_t header_size, Buffer &buffer)
+bool Queue::Pop(void *header, size_t header_size, Buffer &buffer)
 {
 	QueueElement *params;
 
@@ -124,7 +124,7 @@ void Queue::Pop(void *header, size_t header_size, Buffer &buffer)
 		LeaveCriticalSection(&CS);
 
 		if(!cur)
-			Sleep(0);
+			return false;
 	}
 
 	params = (QueueElement *)cur;
@@ -136,4 +136,6 @@ void Queue::Pop(void *header, size_t header_size, Buffer &buffer)
 	EnterCriticalSection(&CS);
 	PopCursor = (char *)(params->Next);
 	LeaveCriticalSection(&CS);
+
+	return true;
 }

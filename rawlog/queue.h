@@ -16,7 +16,7 @@ public:
 	Queue(size_t buffer_size);
 	~Queue();
 	void Push(const void *buffer1, size_t size1, const void *buffer2, size_t size2);
-	void Pop(void *header, size_t header_size, Buffer &buffer);
+	bool Pop(void *header, size_t header_size, Buffer &buffer);
 };
 
 #endif
