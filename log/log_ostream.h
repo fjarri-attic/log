@@ -9,11 +9,9 @@
     \param charT type of characters to handle (char or wchar_t)
 */
 template<class charT>
-struct basic_log_function 
+class log_functor 
 {
-    typedef void result_type;                           // no result
-    typedef const charT * const first_argument_type;    // context
-    typedef const charT * const second_argument_type;   // message
+	virtual void operator()(std::basic_string<charT> &message) = 0;
 };
 
 /*!
@@ -69,7 +67,7 @@ private:
     //! \brief send the current stream content to the output policy 
     void sendToDebugLog()
     {
-        func_(context_.c_str(), buffer_.c_str());   // send context and message 
+        func_(context_ + buffer_);   // send context and message 
     }
 };
 
