@@ -28,14 +28,14 @@ template
     class logfunction,                              // logfunction type
     class traits = std::char_traits<charT>          // character traits 
 >
-class basic_debuglog_buf : public std::basic_streambuf<charT, traits>
+class log_streambuf : public std::basic_streambuf<charT, traits>
 {
     typedef std::basic_string<charT, traits> string_type;   // shortcut for a string 
 
 public:
-    virtual ~basic_debuglog_buf()
+    virtual ~log_streambuf()
     {
-        sync(); // flush buffer
+		sync();
     }
 
     //! \brief Set a context to be displayed before the messages 
@@ -46,24 +46,14 @@ public:
 
 protected:
 
-    /*!
-        \brief Reimplementation, called when a new character is inserted into a full buffer.
-        \param c Current character shiftet to the stream
-    */
-    virtual typename traits::int_type overflow (typename traits::int_type c)
-    {
-        if (!traits::eq_int_type(c, traits::eof())) // if current character is not EOF 
-        {
-            buffer_ += traits::to_char_type(c);     // add current character to buffer
-//            if (c == traits::to_int_type('\n'))     // if current character is a new line 
-//              sync();                             // flush buffer			
-        }
-        return traits::not_eof(c);              
-    }
+	virtual typename traits::int_type overflow (typename traits::int_type c)
+	{
+		if (!traits::eq_int_type(c, traits::eof())) // if current character is not EOF 
+			buffer_ += traits::to_char_type(c);     // add current character to buffer
 
-    /*!
-        \brief Reimplementation, sends the buffer to the Debuglogfunction, and clears it.
-    */
+		return traits::not_eof(c);              
+	}
+
     virtual int sync()
     {
         if (!buffer_.empty())   // if characters in the buffer  
@@ -95,10 +85,10 @@ template
     class logfunction,                          // logfunction type
     class traits = std::char_traits<charT>      // character traits 
 >
-class basic_debuglog_stream : public std::basic_ostream<charT, traits>
+class log_ostream : public std::basic_ostream<charT, traits>
 {
     typedef std::basic_string<charT, traits> string_type;                   // shortcut for a string
-    typedef basic_debuglog_buf<charT, logfunction, traits> buffer_type;     // shortcut for the streambuffer
+    typedef log_streambuf<charT, logfunction, traits> buffer_type;     // shortcut for the streambuffer
     typedef std::basic_ostream<charT, traits> stream_type;                  // shortcut for the stream 
     typedef std::basic_ostringstream<charT, traits> stringstream_type;      // shortcut for a stringstream 
 
@@ -108,7 +98,7 @@ public:
         \param file the filename where the debuglogging occured
         \param line the linenumber where the debuglogging occured
     */
-    basic_debuglog_stream(const char *file = 0, int line = -1)
+    log_ostream(const char *file = 0, int line = -1)
         : stream_type(&buf_), file_(file), line_(line)
     {
         buildContext(); // build the whole context and set it to the streambuffer
@@ -120,14 +110,14 @@ public:
         \param file the filename where the debuglogging occured
         \param line the linenumber where the debuglogging occured
     */
-    basic_debuglog_stream(const string_type &context, const char *file = 0, int line = -1)  
+    log_ostream(const string_type &context, const char *file = 0, int line = -1)  
         : stream_type(&buf_), file_(file), line_(line), context_(context)
     {
         buildContext(); // build the whole context and set it to the streambuffer
     }
 
     // allow deriving 
-    virtual ~basic_debuglog_stream() {}
+    virtual ~log_ostream() {}
 
     /*!
         \brief set the prefix string for the debugoutput
@@ -152,12 +142,12 @@ public:
         \brief get a reference to the stream (for temporaries)
         \returns a reference to the stream 
     */
-    basic_debuglog_stream &get() {return *this;}
+    log_ostream &get() {return *this;}
 
 private:
     // don't allow copying of the stream
-    basic_debuglog_stream(const basic_debuglog_stream &);
-    basic_debuglog_stream &operator=(const basic_debuglog_stream &);
+    log_ostream(const log_ostream &);
+    log_ostream &operator=(const log_ostream &);
 
     /*!
         \brief  Build the prefix for the debugmessage

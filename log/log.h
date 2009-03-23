@@ -15,7 +15,9 @@ template<class charT>
 class log_to_file : public basic_log_function<charT>
 {
 public:
-	typename basic_log_function<charT>::result_type operator()(typename basic_log_function<charT>::second_argument_type context, typename basic_log_function<charT>::second_argument_type output)
+	typename basic_log_function<charT>::result_type operator()(
+			typename basic_log_function<charT>::second_argument_type context, 
+			typename basic_log_function<charT>::second_argument_type output)
 	{    
 		std::basic_string<charT> str = context;
 		str += output;
@@ -23,7 +25,7 @@ public:
 	}
 };
 
-typedef basic_debuglog_stream<TCHAR, log_to_file<TCHAR> > DebugLogger;
+typedef log_ostream<TCHAR, log_to_file<TCHAR> > DebugLogger;
 
 
 #endif
