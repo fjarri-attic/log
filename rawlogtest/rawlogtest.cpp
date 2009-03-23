@@ -66,8 +66,8 @@ int _tmain(int argc, TCHAR *argv[])
 
 	Sleep(10000);
 	SetEvent(stop_event);
-	RawLogStop(0);
 	WaitForMultipleObjects(10, threads, TRUE, INFINITE);
+	RawLogStop(0);
 
 	return 0;
 }
