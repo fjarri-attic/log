@@ -12,52 +12,70 @@ void SwapBuffers(Buffer *&buf1, Buffer *&buf2)
 	buf2 = temp;
 }
 
+int LogFile::Flush(LogFile *lf, const MessageHeader &header, Buffer &main_buf, Buffer &temp_buf)
+{
+	Buffer *primary_buf = &main_buf;
+	Buffer *secondary_buf = &temp_buf;
+
+	if(header.Unicode)
+	{
+		UnicodeToMbStr(*primary_buf, *secondary_buf);
+		SwapBuffers(primary_buf, secondary_buf);
+	}
+
+	// Replace LF -> CRLF
+	if(lf->ReplaceLF)
+	{
+		ExpandLF(*primary_buf, *secondary_buf);
+		SwapBuffers(primary_buf, secondary_buf);
+	}
+
+	// Write string without ending zero symbol
+	int res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize() - 1);
+	if(res)
+		return res;
+
+	return 0;
+}
+
 //
 DWORD WINAPI LogFile::LogThreadProc(PVOID context)
 {
 	LogFile *lf = (LogFile *)context;
-	DWORD res;
-
 	Buffer buf1, buf2;
-
-	DWORD counter = 0;
+	int res, counter = 0;
 	MessageHeader header;
 
 	while(WaitForSingleObject(lf->StopEvent, 0) != WAIT_OBJECT_0)
 	{
-		Buffer *primary_buf = &buf1;
-		Buffer *secondary_buf = &buf2;
+		Sleep(0);
 
-		if(!lf->Pop(&header, *primary_buf))
-		{
-			Sleep(0);
+		if(!lf->Pop(&header, buf1))
 			continue;
-		}
 
-		if(header.Unicode)
-		{
-			UnicodeToMbStr(*primary_buf, *secondary_buf);
-			SwapBuffers(primary_buf, secondary_buf);
-		}
-
-		// Replace LF -> CRLF
-		if(lf->ReplaceLF)
-		{
-			ExpandLF(*primary_buf, *secondary_buf);
-			SwapBuffers(primary_buf, secondary_buf);
-		}
-
-		// Write string without ending zero symbol
-		res = lf->Write(primary_buf->GetPtr(), primary_buf->GetDataSize() - 1);
+		res = Flush(lf, header, buf1, buf2);
 		if(res)
 			return res;
 
 		counter++;
-
-		Sleep(0);
 	}
 
 	_tprintf(_T("Logged: %d\n"), counter);
+
+	counter = 0;
+
+	if(lf->FlushRemains)
+	{
+		while(lf->Pop(&header, buf1))
+		{
+			res = Flush(lf, header, buf1, buf2);
+			if(res)
+				return res;
+			counter++;
+		}
+	}
+
+	_tprintf(_T("Flushed: %d\n"), counter);
 
 	return 0;
 }
@@ -67,6 +85,7 @@ LogFile::LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size
 {
 	Running = false;
 	ReplaceLF = true;
+	FlushRemains = false;
 	StopEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
 
@@ -91,12 +110,15 @@ bool LogFile::Pop(MessageHeader *header, Buffer &buffer)
 	return MessageQueue.Pop(header, sizeof(*header), buffer);
 }
 
-void LogFile::Stop()
+void LogFile::Stop(bool flush_remains)
 {
 	if(Running)
 	{
+		DWORD timeout = (flush_remains ? INFINITE : 10000);
+		FlushRemains = flush_remains;
+
 		SetEvent(StopEvent);
-		if(WaitForSingleObject(LoggerThread, 10000) == WAIT_TIMEOUT)
+		if(WaitForSingleObject(LoggerThread, timeout) == WAIT_TIMEOUT)
 		{
 			_ftprintf(stderr, _T("Logging thread timeouted, terminating\n"));
 			TerminateThread(LoggerThread, (DWORD)-1);

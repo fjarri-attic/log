@@ -13,6 +13,7 @@ class LogFile
 {
 private:
 	bool ReplaceLF;
+	bool FlushRemains;
 
 	HANDLE StopEvent;
 	HANDLE LoggerThread;
@@ -22,16 +23,19 @@ private:
 	Queue MessageQueue;
 	File TargetFile;
 
+	int Write(const void *buf, size_t size);
+	bool Pop(MessageHeader *header, Buffer &buffer);
+
+	static int Flush(LogFile *lf, const MessageHeader &header, Buffer &main_buf, Buffer &temp_buf);
+	static DWORD WINAPI LogThreadProc(PVOID context);
+
 public:
 	LogFile(const void *file_name, bool name_is_unicode, size_t buffer_size, bool keep_closed);
 	~LogFile();
 
-	int Write(const void *buf, size_t size);
 	void Push(const MessageHeader *header, const void *message, size_t message_size);
-	bool Pop(MessageHeader *header, Buffer &buffer);
-	void Stop();
+	void Stop(bool flush_remains = true);
 	int Start();
-	static DWORD WINAPI LogThreadProc(PVOID context);
 };
 
 
