@@ -103,7 +103,9 @@ public:
     }
 
     // allow deriving 
-    virtual ~log_ostream() {}
+	virtual ~log_ostream() {}
+
+	log_ostream &get() {return *this;}
 
 private:
     // don't allow copying of the stream
