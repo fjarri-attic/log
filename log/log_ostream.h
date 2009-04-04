@@ -96,51 +96,14 @@ public:
         \param file the filename where the debuglogging occured
         \param line the linenumber where the debuglogging occured
     */
-    log_ostream(const char *file = 0, int line = -1)
-        : stream_type(&buf_), file_(file), line_(line)
-    {
-        buildContext(); // build the whole context and set it to the streambuffer
-    }
-
-    /*!
-        \brief A constructor for providing a context string 
-        \param context the context string 
-        \param file the filename where the debuglogging occured
-        \param line the linenumber where the debuglogging occured
-    */
-    log_ostream(const string_type &context, const char *file = 0, int line = -1)  
-        : stream_type(&buf_), file_(file), line_(line), context_(context)
+    log_ostream(int level, const char *file = 0, int line = -1)
+        : level_(level), stream_type(&buf_), file_(file), line_(line)
     {
         buildContext(); // build the whole context and set it to the streambuffer
     }
 
     // allow deriving 
     virtual ~log_ostream() {}
-
-    /*!
-        \brief set the prefix string for the debugoutput
-        \param context the context string for the stream 
-    */
-    void setContext(const string_type &context)
-    {
-        context_ = context;
-        buildContext();
-    }
-
-    /*!
-        \brief  retrieve the prefix string for the debugoutput
-        \returns the context string of the stream 
-    */
-    const string_type getContext() const
-    {
-        return context_;
-    }
-
-    /*!
-        \brief get a reference to the stream (for temporaries)
-        \returns a reference to the stream 
-    */
-    log_ostream &get() {return *this;}
 
 private:
     // don't allow copying of the stream
@@ -161,14 +124,12 @@ private:
             os << "(" << line_ << ")";  // show it in brackets
         if (file_ || line_ >= 0)        // if filename or linenumber given
             os << " : ";                // separate it by a double colon from context or message
-        if (!context_.empty())          // if a context string is given
-            os << context_ << " : ";    // show it at last separate it by a double colon from the message
         buf_.setContext(os.str());      // set the context to the streambuffer
     }
 
+	const int level_;
     const char *file_;					//! name of the sourcefile where the debuglogger was instantiated.
     const int line_;					//! number of the line in file_ where the debuglogger was instantiated.
-    string_type context_;				//! additional context for output (after file_ and line_)
     buffer_type buf_;					//! the streambuffer which sends it's content to OutputDebugString
 };
 
