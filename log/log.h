@@ -80,5 +80,6 @@ void log_to_stdout<wchar_t>::operator()(std::basic_string<wchar_t> &message)
 //typedef log_ostream<TCHAR, log_to_file<TCHAR, 0> > DebugLogger;
 typedef log_ostream<TCHAR, log_to_stderr<TCHAR> > DebugLogger;
 
+#define LogMsg DebugLogger(__FILE__, __LINE__).get() 
 
 #endif

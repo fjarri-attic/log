@@ -6,7 +6,7 @@
 int _tmain(int argc, TCHAR *argv[])
 {
 	RawLogStart(0, _T("debug.log"));
-	DebugLogger(__FILE__, __LINE__).get() << _T("Test\n") << _T("TTT\n");
+	LogMsg << _T("Test\n") << _T("TTT\n");
 	RawLogStop(0);
 /*
 	Log.Init(MainLog, "mainlog.txt");
