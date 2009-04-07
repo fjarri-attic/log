@@ -12,44 +12,24 @@ enum LogLevel
 	Debug
 };
 
-char *LogLevelStringsA[] = {
+char *LogLevelStrings[] = {
 	"[Error] ", "[Warning] ", "[Message] ", "[Debug] "
 };
 
-wchar_t *LogLevelStringsW[] = {
-	L"[Error] ", L"[Warning] ", L"[Message] ", L"[Debug] "
-};
-
 //
 template<class charT>
-void AddLevelStr(LogLevel level, std::basic_string<charT> &target);
+void AddLineFolding(std::basic_string<charT> &target);
 
 template<>
-void AddLevelStr<char>(LogLevel level, std::basic_string<char> &target)
+void AddLineFolding(std::basic_string<char> &target)
 {
-	target += LogLevelStringsA[level];
+	target += '\n';
 }
 
 template<>
-void AddLevelStr<wchar_t>(LogLevel level, std::basic_string<wchar_t> &target)
+void AddLineFolding(std::basic_string<wchar_t> &target)
 {
-	target += LogLevelStringsW[level];
-}
-
-//
-template<class charT>
-std::basic_string<charT> GetLineFolding();
-
-template<>
-std::basic_string<char> GetLineFolding()
-{
-	return std::basic_string<char>("\n");
-}
-
-template<>
-std::basic_string<wchar_t> GetLineFolding()
-{
-	return std::basic_string<wchar_t>(L"\n");
+	target += L'\n';
 }
 
 /*!
@@ -59,7 +39,7 @@ std::basic_string<wchar_t> GetLineFolding()
 template<class charT>
 class log_functor 
 {
-	virtual void operator()(std::basic_string<charT> &message) = 0;
+	virtual void operator()(std::basic_string<charT> &message, LogLevel level) = 0;
 };
 
 /*!
@@ -85,9 +65,9 @@ public:
 	}
 
 	//! \brief Set a context to be displayed before the messages 
-	void setContext(const string_type &context)
+	void setContext(LogLevel level)
 	{
-		context_ = context;
+		level_ = level;
 	}
 
 protected:
@@ -104,7 +84,8 @@ protected:
 	{
 		if(!buffer_.empty())
 		{
-			sendToDebugLog();   // send them to the debuglogfunction 
+			AddLineFolding<charT>(buffer_);
+			func_(buffer_, level_);   // send context and message 
 			buffer_.clear();
 		}
 		
@@ -112,14 +93,9 @@ protected:
 	}
 
 private:
-	string_type buffer_, context_;
+	string_type buffer_;
 	logfunction func_;					//! the logfunction functor
-
-	//! \brief send the current stream content to the output policy 
-	void sendToDebugLog()
-	{
-		func_(context_ + buffer_ + GetLineFolding<charT>());   // send context and message 
-	}
+	LogLevel level_;
 };
 
 
@@ -148,10 +124,18 @@ public:
 		\param file the filename where the debuglogging occured
 		\param line the linenumber where the debuglogging occured
 	*/
-	log_ostream(LogLevel level, const char *file = 0, int line = -1)
-		: level_(level), stream_type(&buf_), file_(file), line_(line)
+	log_ostream(LogLevel level, const char *file = 0, int line = -1) :
+		stream_type(&buf_)
 	{
-		buildContext(); 
+		if (file)					  // if a filename is given
+			*this << file;				// show it first
+		if (line >= 0)				 // if a linenumber is given
+			*this << "(" << line << ")";  // show it in brackets
+		if (file || line >= 0)		// if filename or linenumber given
+			*this << ": ";				// separate it by a double colon from context or message
+
+		*this << LogLevelStrings[level];
+		buf_.setContext(level);
 	}
 
 	// allow deriving 
@@ -164,30 +148,7 @@ private:
 	log_ostream(const log_ostream &);
 	log_ostream &operator=(const log_ostream &);
 
-	/*!
-		\brief  Build the prefix for the debugmessage
-				[<filename>][(<linenumber>) : ][<context> : ]
-	*/
-	void buildContext()
-	{
-		stringstream_type os;			// format the prefix via stringstream 
-
-		if (file_)					  // if a filename is given
-			os << file_;				// show it first
-		if (line_ >= 0)				 // if a linenumber is given
-			os << "(" << line_ << ")";  // show it in brackets
-		if (file_ || line_ >= 0)		// if filename or linenumber given
-			os << ": ";				// separate it by a double colon from context or message
-		context_ = os.str();
-		AddLevelStr(level_, context_);
-		buf_.setContext(context_);
-	}
-
-	LogLevel level_;
-	const char *file_;					//! name of the sourcefile where the debuglogger was instantiated.
-	const int line_;					//! number of the line in file_ where the debuglogger was instantiated.
 	buffer_type buf_;					//! the streambuffer which sends it's content to OutputDebugString
-	string_type context_;
 };
 
 #endif 

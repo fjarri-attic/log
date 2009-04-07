@@ -16,14 +16,14 @@ template<class charT, int FileID>
 class log_to_file : public log_functor<charT>
 {
 public:
-	void operator()(std::basic_string<charT> &message);
+	void operator()(std::basic_string<charT> &message, LogLevel level);
 };
 
 template<int FileID> 
 class log_to_file<char, FileID> : public log_functor<char>
 {
 public:
-	void operator()(std::basic_string<char> &message)
+	void operator()(std::basic_string<char> &message, LogLevel level)
 	{
 		RawLogWriteA(FileID, message.c_str());
 	}	
@@ -33,7 +33,7 @@ template<int FileID>
 class log_to_file<wchar_t, FileID> : public log_functor<wchar_t>
 {
 public:
-	void operator()(std::basic_string<wchar_t> &message)
+	void operator()(std::basic_string<wchar_t> &message, LogLevel level)
 	{
 		RawLogWriteW(FileID, message.c_str());
 	}	
@@ -42,39 +42,26 @@ public:
 
 // Output to stderr
 template<class charT>
-class log_to_stderr : public log_functor<charT>
+class log_to_console : public log_functor<charT>
 {
 public:
-	void operator()(std::basic_string<charT> &message);
+	void operator()(std::basic_string<charT> &message, LogLevel level);
 };
 
-void log_to_stderr<char>::operator()(std::basic_string<char> &message)
+void log_to_console<char>::operator()(std::basic_string<char> &message, LogLevel level)
 {
-	std::cerr << message;
+	if(level == Error || level == Warning)
+		std::cerr << message;
+	else
+		std::cout << message;
 }
 
-void log_to_stderr<wchar_t>::operator()(std::basic_string<wchar_t> &message)
+void log_to_console<wchar_t>::operator()(std::basic_string<wchar_t> &message, LogLevel level)
 {
-	std::wcerr << message;
+	if(level == Error || level == Warning)
+		std::wcerr << message;
+	else
+		std::wcout << message;
 }
-
-// Output to stdout
-template<class charT>
-class log_to_stdout : public log_functor<charT>
-{
-public:
-	void operator()(std::basic_string<charT> &message);
-};
-
-void log_to_stdout<char>::operator()(std::basic_string<char> &message)
-{
-	std::cout << message;
-}
-
-void log_to_stdout<wchar_t>::operator()(std::basic_string<wchar_t> &message)
-{
-	std::wcout << message;
-}
-
 
 #endif

@@ -4,7 +4,7 @@
 #include "..\log\log.h"
 
 //typedef log_ostream<TCHAR, log_to_file<TCHAR, 0> > DebugLogger;
-#define SystemLog(lev) log_ostream<TCHAR, log_to_stderr<TCHAR> >(lev, __FILE__, __LINE__).get()
+#define SystemLog(lev) log_ostream<TCHAR, log_to_console<TCHAR> >(lev, __FILE__, __LINE__).get()
 
 int _tmain(int argc, TCHAR *argv[])
 {
