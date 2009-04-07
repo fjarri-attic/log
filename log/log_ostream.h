@@ -12,25 +12,12 @@ enum LogLevel
 	Debug
 };
 
-char *LogLevelStrings[] = {
-	"[Error] ", "[Warning] ", "[Message] ", "[Debug] "
-};
 
 //
 template<class charT>
 void AddLineFolding(std::basic_string<charT> &target);
 
-template<>
-void AddLineFolding(std::basic_string<char> &target)
-{
-	target += '\n';
-}
-
-template<>
-void AddLineFolding(std::basic_string<wchar_t> &target)
-{
-	target += L'\n';
-}
+std::string AddContext(LogLevel level, const char *file = 0, int line = -1);
 
 /*!
 	\brief Functor definition for output policy
@@ -127,21 +114,13 @@ public:
 	log_ostream(LogLevel level, const char *file = 0, int line = -1) :
 		stream_type(&buf_)
 	{
-		if (file)					  // if a filename is given
-			*this << file;				// show it first
-		if (line >= 0)				 // if a linenumber is given
-			*this << "(" << line << ")";  // show it in brackets
-		if (file || line >= 0)		// if filename or linenumber given
-			*this << ": ";				// separate it by a double colon from context or message
-
-		*this << LogLevelStrings[level];
-		buf_.setContext(level);
+		*this << AddContext(level, file, line).c_str();
 	}
 
 	// allow deriving 
 	virtual ~log_ostream() {}
 
-	log_ostream &get() {return *this;}
+	log_ostream &get() { return *this; }
 
 private:
 	// don't allow copying of the stream

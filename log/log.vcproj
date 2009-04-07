@@ -150,6 +150,10 @@
 				RelativePath=".\log.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\log_ostream.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
