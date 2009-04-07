@@ -50,12 +50,12 @@ public:
 
 void log_to_stderr<char>::operator()(std::basic_string<char> &message)
 {
-	std::cerr << message << std::endl;
+	std::cerr << message;
 }
 
 void log_to_stderr<wchar_t>::operator()(std::basic_string<wchar_t> &message)
 {
-	std::wcerr << message << std::endl;
+	std::wcerr << message;
 }
 
 // Output to stdout
@@ -68,14 +68,13 @@ public:
 
 void log_to_stdout<char>::operator()(std::basic_string<char> &message)
 {
-	std::cout << message << std::endl;
+	std::cout << message;
 }
 
 void log_to_stdout<wchar_t>::operator()(std::basic_string<wchar_t> &message)
 {
-	std::wcout << message << std::endl;
+	std::wcout << message;
 }
-
 
 
 #endif
