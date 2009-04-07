@@ -90,15 +90,6 @@ public:
 		context_ = context;
 	}
 
-	void finishLine()
-	{
-		if(buffer_.empty())
-			return;
-
-		full_line += context_ + buffer_ + GetLineFolding<charT>();
-		buffer_.clear();
-	}
-
 protected:
 
 	virtual typename traits::int_type overflow (typename traits::int_type c)
@@ -111,21 +102,23 @@ protected:
 
 	virtual int sync()
 	{
-		finishLine();
-				
-		if(!full_line.empty())
+		if(!buffer_.empty())
+		{
 			sendToDebugLog();   // send them to the debuglogfunction 
+			buffer_.clear();
+		}
+		
 		return 0;
 	}
 
 private:
-	string_type buffer_, context_, full_line;
+	string_type buffer_, context_;
 	logfunction func_;					//! the logfunction functor
 
 	//! \brief send the current stream content to the output policy 
 	void sendToDebugLog()
 	{
-		func_(full_line);   // send context and message 
+		func_(context_ + buffer_ + GetLineFolding<charT>());   // send context and message 
 	}
 };
 
@@ -155,23 +148,11 @@ public:
 		\param file the filename where the debuglogging occured
 		\param line the linenumber where the debuglogging occured
 	*/
-	log_ostream(const char *file = 0, int line = -1)
-		: stream_type(&buf_), file_(file), line_(line)
+	log_ostream(LogLevel level, const char *file = 0, int line = -1)
+		: level_(level), stream_type(&buf_), file_(file), line_(line)
 	{
-		level_ = Message;
 		buildContext(); 
 	}
-
-	log_ostream &operator<<(LogLevel level)
-	{
-		level_ = level;
-		string_type context = context_;
-		AddLevelStr(level, context);
-		buf_.setContext(context);	  // set the context to the streambuffer
-		buf_.finishLine();
-		return *this;
-	}
-	
 
 	// allow deriving 
 	virtual ~log_ostream() {}
@@ -198,6 +179,8 @@ private:
 		if (file_ || line_ >= 0)		// if filename or linenumber given
 			os << ": ";				// separate it by a double colon from context or message
 		context_ = os.str();
+		AddLevelStr(level_, context_);
+		buf_.setContext(context_);
 	}
 
 	LogLevel level_;
